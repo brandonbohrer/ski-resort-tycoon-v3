@@ -14,6 +14,7 @@ public class DesktopLauncher {
         config.setTitle("Ski Resort Tycoon");
         config.setWindowedMode(1280, 720);
         config.setForegroundFPS(60);
+        config.setBackBufferConfig(8, 8, 8, 8, 16, 0, 4); // Ensure Depth Buffer (16-bit) exists
 
         // Initialize the simulation core first
         TycoonSimulation simulation = new TycoonSimulation();

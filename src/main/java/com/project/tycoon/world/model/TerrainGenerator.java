@@ -23,7 +23,12 @@ public class TerrainGenerator {
                 // Base at Front (z=0)
                 
                 // Normalized Z (0 to 1)
-                float normZ = (float)z / depth; 
+                // We invert Z so 0 (Front) is Low, Depth (Back) is High.
+                // Wait, in Isometric +Z is usually South (Foreground). 
+                // Camera is at +Z looking at -Z.
+                // So if we want Mountain at Top (Background, -Z), we want High Height at Low Z.
+                // So normZ should be 1.0 at z=0, and 0.0 at z=depth.
+                float normZ = 1.0f - (float)z / depth; 
                 
                 // Distance from center X
                 float distX = Math.abs(x - width/2f) / (width/2f); // 0 at center, 1 at edges

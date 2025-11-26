@@ -1,150 +1,234 @@
 package com.project.tycoon.view.renderer;
 
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.VertexAttributes.Usage;
+import com.badlogic.gdx.graphics.g3d.Environment;
+import com.badlogic.gdx.graphics.g3d.Material;
+import com.badlogic.gdx.graphics.g3d.Model;
+import com.badlogic.gdx.graphics.g3d.ModelBatch;
+import com.badlogic.gdx.graphics.g3d.ModelInstance;
+import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
+import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
+import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder;
+import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder;
+import com.badlogic.gdx.math.Vector3;
 import com.project.tycoon.ecs.Engine;
 import com.project.tycoon.ecs.Entity;
 import com.project.tycoon.ecs.components.LiftComponent;
+import com.project.tycoon.ecs.components.SkierComponent;
 import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.world.model.Tile;
+import com.project.tycoon.world.model.TerrainType;
 import com.project.tycoon.world.model.WorldMap;
-import com.badlogic.gdx.math.Vector2;
+import com.project.tycoon.view.util.IsoUtils;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
-import com.badlogic.gdx.graphics.Color; // Import Color
-import com.project.tycoon.view.util.IsoUtils; // Import shared utils
 
-import com.project.tycoon.ecs.components.SkierComponent; // Add Skier import
+import com.badlogic.gdx.graphics.g3d.attributes.IntAttribute; // Import IntAttribute
 
 /**
- * Handles rendering of both Tiles and Entities, sorted by depth.
- * Replaces the simple WorldRenderer.
+ * Renders the game world using 3D meshes for a smooth "Snowtopia" aesthetic.
+ * Replaces the old Sprite-based rendering.
  */
 public class CombinedRenderer {
 
     private final WorldMap worldMap;
     private final Engine ecsEngine;
-    private final SpriteBatch batch;
     
-    // Constants now come from IsoUtils to ensure sync with Logic/Mouse
-    private static final float TILE_WIDTH = IsoUtils.TILE_WIDTH;
-    private static final float TILE_HEIGHT = IsoUtils.TILE_HEIGHT;
+    private final ModelBatch modelBatch;
+    private final Environment environment;
+    
+    private Model terrainModel;
+    private ModelInstance terrainInstance;
+    
+    // Reusable entity models (simple shapes for now)
+    private Model skierModel;
+    private Model liftPylonModel;
+    private Model cursorModel;
 
     public CombinedRenderer(WorldMap worldMap, Engine ecsEngine) {
         this.worldMap = worldMap;
         this.ecsEngine = ecsEngine;
-        this.batch = new SpriteBatch();
+        
+        this.modelBatch = new ModelBatch();
+        
+        // 1. Setup Lighting
+        this.environment = new Environment();
+        environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.6f, 0.6f, 0.6f, 1f));
+        environment.add(new DirectionalLight().set(0.8f, 0.8f, 0.8f, -1f, -0.8f, -0.2f));
+        
+        // 2. Build Models
+        buildTerrainModel();
+        buildEntityModels();
+    }
+    
+    private void buildEntityModels() {
+        ModelBuilder mb = new ModelBuilder();
+        
+        // Skier: Red Box
+        skierModel = mb.createBox(0.4f, 0.8f, 0.4f, 
+            new Material(ColorAttribute.createDiffuse(Color.RED)),
+            Usage.Position | Usage.Normal);
+            
+        // Lift Pylon: Gray Pillar
+        liftPylonModel = mb.createBox(0.2f, 3.0f, 0.2f, 
+            new Material(ColorAttribute.createDiffuse(Color.GRAY)),
+            Usage.Position | Usage.Normal);
+
+        // Cursor: Semi-transparent Blue Box
+        cursorModel = mb.createBox(1.0f, 0.1f, 1.0f,
+            new Material(ColorAttribute.createDiffuse(new Color(0f, 0f, 1f, 0.5f))),
+            Usage.Position | Usage.Normal);
     }
 
-    // Updated signature to accept LiftPreview
-    public void render(OrthographicCamera camera, int hoveredX, int hoveredZ, boolean isBuildMode, LiftPreview preview) {
-        batch.setProjectionMatrix(camera.combined);
-        batch.begin();
-
-        // --- RENDER TERRAIN ---
-        for (int z = 0; z < worldMap.getDepth(); z++) {
-            for (int x = 0; x < worldMap.getWidth(); x++) {
-                drawTile(x, z, hoveredX, hoveredZ, isBuildMode);
-            }
-        }
+    private void buildTerrainModel() {
+        ModelBuilder mb = new ModelBuilder();
+        mb.begin();
         
-        // --- RENDER ENTITIES ---
-        for (Entity entity : ecsEngine.getEntities()) {
-            if (ecsEngine.hasComponent(entity, TransformComponent.class)) {
-                TransformComponent transform = ecsEngine.getComponent(entity, TransformComponent.class);
+        int chunkSize = 64;
+        int width = worldMap.getWidth();
+        int depth = worldMap.getDepth();
+        
+        Vector3 p1 = new Vector3();
+        Vector3 p2 = new Vector3();
+        Vector3 p3 = new Vector3();
+        Vector3 p4 = new Vector3();
+        Vector3 norm = new Vector3(0, 1, 0);
+
+        for (int cz = 0; cz < depth - 1; cz += chunkSize) {
+            for (int cx = 0; cx < width - 1; cx += chunkSize) {
                 
-                if (ecsEngine.hasComponent(entity, LiftComponent.class)) {
-                    drawLift(transform, Color.WHITE);
-                } else if (ecsEngine.hasComponent(entity, SkierComponent.class)) {
-                    drawSkier(transform);
+                MeshPartBuilder builder = mb.part(
+                    "chunk_" + cx + "_" + cz, 
+                    GL20.GL_TRIANGLES, 
+                    Usage.Position | Usage.ColorPacked | Usage.Normal, 
+                    new Material(
+                        ColorAttribute.createDiffuse(Color.WHITE), 
+                        new IntAttribute(IntAttribute.CullFace, 0) // Disable Culling (Double Sided)
+                    )
+                );
+                
+                int endX = Math.min(cx + chunkSize, width - 1);
+                int endZ = Math.min(cz + chunkSize, depth - 1);
+
+                for (int z = cz; z < endZ; z++) {
+                    for (int x = cx; x < endX; x++) {
+                        // Get Heights
+                        float h1 = worldMap.getTile(x, z).getHeight() * IsoUtils.HEIGHT_SCALE;
+                        float h2 = worldMap.getTile(x+1, z).getHeight() * IsoUtils.HEIGHT_SCALE;
+                        float h3 = worldMap.getTile(x+1, z+1).getHeight() * IsoUtils.HEIGHT_SCALE;
+                        float h4 = worldMap.getTile(x, z+1).getHeight() * IsoUtils.HEIGHT_SCALE;
+                        
+                        // Set Color based on tile type
+                        Tile tile = worldMap.getTile(x, z);
+                        builder.setColor(getTerrainColor(tile.getType(), h1));
+                        
+                        // Define Vertices
+                        p1.set(x, h1, z);
+                        p2.set(x+1, h2, z);
+                        p3.set(x+1, h3, z+1);
+                        p4.set(x, h4, z+1);
+                        
+                        // Simple normal calc for p1-p2-p4 triangle
+                        Vector3 u = new Vector3(p2).sub(p1);
+                        Vector3 v = new Vector3(p4).sub(p1);
+                        
+                        // Fix: (v cross u) points UP. (u cross v) pointed DOWN.
+                        Vector3 faceNorm = v.crs(u).nor(); 
+                        
+                        builder.rect(p1, p2, p3, p4, faceNorm);
+                    }
                 }
             }
         }
         
-        // --- RENDER PREVIEW (Ghosts) ---
+        terrainModel = mb.end();
+        terrainInstance = new ModelInstance(terrainModel);
+    }
+    
+    private Color getTerrainColor(TerrainType type, float height) {
+        switch(type) {
+            case SNOW: return Color.WHITE;
+            case GRASS: return new Color(0.2f, 0.6f, 0.1f, 1f); // Forest Green
+            case ROCK: return Color.GRAY;
+            case DIRT: return new Color(0.5f, 0.3f, 0.1f, 1f);
+            default: return Color.WHITE;
+        }
+    }
+
+    public void render(OrthographicCamera camera, int hoveredX, int hoveredZ, boolean isBuildMode, LiftPreview preview) {
+        // Check for map updates
+        if (worldMap.isDirty()) {
+            if (terrainModel != null) terrainModel.dispose();
+            buildTerrainModel();
+            worldMap.clean();
+        }
+
+        modelBatch.begin(camera);
+        
+        // 1. Render Terrain
+        if (terrainInstance != null) {
+             modelBatch.render(terrainInstance, environment);
+        }
+        
+        // 2. Render Entities
+        for (Entity entity : ecsEngine.getEntities()) {
+            if (ecsEngine.hasComponent(entity, TransformComponent.class)) {
+                TransformComponent t = ecsEngine.getComponent(entity, TransformComponent.class);
+                
+                float drawX = t.x;
+                float drawZ = t.z;
+                float drawY = t.y * IsoUtils.HEIGHT_SCALE; 
+                
+                if (ecsEngine.hasComponent(entity, LiftComponent.class)) {
+                    renderModelAt(liftPylonModel, drawX, drawY, drawZ, Color.WHITE);
+                } else if (ecsEngine.hasComponent(entity, SkierComponent.class)) {
+                    renderModelAt(skierModel, drawX, drawY, drawZ, Color.WHITE);
+                }
+            }
+        }
+        
+        // 3. Render Cursor
+        if (hoveredX >= 0 && hoveredZ >= 0) {
+            Tile t = worldMap.getTile(hoveredX, hoveredZ);
+            if (t != null) {
+                float h = t.getHeight() * IsoUtils.HEIGHT_SCALE;
+                Color cursorColor = isBuildMode ? Color.BLUE : Color.YELLOW;
+                renderModelAt(cursorModel, hoveredX, h + 0.1f, hoveredZ, cursorColor); // Lift slightly
+            }
+        }
+        
+        // 4. Render Preview (Ghosts)
         if (preview != null && !preview.pylonPositions.isEmpty()) {
-            batch.setColor(1f, 1f, 1f, 0.5f); // 50% transparency
-            for (Vector2 pos : preview.pylonPositions) {
-                int x = (int) pos.x;
-                int z = (int) pos.y;
-                
-                // Get height from map so ghost sits on terrain
-                Tile tile = worldMap.getTile(x, z);
-                float h = (tile != null) ? tile.getHeight() : 0;
-                
-                // Create temporary transform for drawing logic
-                TransformComponent ghostTransform = new TransformComponent(x, h, z);
-                drawLift(ghostTransform, preview.isValid ? preview.statusColor : Color.RED);
+            Color ghostColor = preview.isValid ? Color.GREEN : Color.RED;
+            for (com.badlogic.gdx.math.Vector2 pos : preview.pylonPositions) {
+                int x = (int)pos.x;
+                int z = (int)pos.y;
+                Tile t = worldMap.getTile(x, z);
+                float h = (t != null) ? t.getHeight() * IsoUtils.HEIGHT_SCALE : 0;
+                renderModelAt(liftPylonModel, x, h, z, ghostColor);
             }
-            batch.setColor(Color.WHITE); // Reset
         }
 
-        batch.end();
+        modelBatch.end();
     }
     
-    private void drawTile(int x, int z, int hoveredX, int hoveredZ, boolean isBuildMode) {
-        Tile tile = worldMap.getTile(x, z);
-        if (tile == null) return;
-
-        Texture tex = TextureFactory.getTexture(tile.getType());
+    private void renderModelAt(Model model, float x, float y, float z, Color tint) {
+        // Note: Creating ModelInstance every frame is garbage-heavy.
+        ModelInstance instance = new ModelInstance(model);
+        instance.transform.setToTranslation(x + 0.5f, y, z + 0.5f); // Center in tile
         
-        float isoX = (x - z) * (TILE_WIDTH / 2f);
-        float isoY = (x + z) * (TILE_HEIGHT / 2f);
-        float heightOffset = tile.getHeight() * 8f;
-
-        batch.draw(tex, isoX, isoY + heightOffset);
-
-        if (x == hoveredX && z == hoveredZ) {
-            // Change cursor color based on mode
-            if (isBuildMode) {
-                batch.setColor(Color.BLUE); // Tint blue for build mode
-            } else {
-                batch.setColor(Color.WHITE); // Default
-            }
-            
-            batch.draw(TextureFactory.getCursorTexture(), isoX, isoY + heightOffset);
-            
-            batch.setColor(Color.WHITE); // Reset
-        }
-    }
-    
-    private void drawSkier(TransformComponent t) {
-        Texture tex = EntityTextureFactory.getSkierTexture();
+        instance.materials.get(0).set(ColorAttribute.createDiffuse(tint));
         
-        float isoX = (t.x - t.z) * (TILE_WIDTH / 2f);
-        float isoY = (t.x + t.z) * (TILE_HEIGHT / 2f);
-        float heightOffset = t.y * 8f;
-        
-        // Center the skier (4x8 px)
-        float drawX = isoX + (TILE_WIDTH - 4)/2f;
-        float drawY = isoY + heightOffset;
-        
-        batch.draw(tex, drawX, drawY);
-    }
-
-    private void drawLift(TransformComponent t, Color tint) {
-        Texture tex = EntityTextureFactory.getLiftPylonTexture();
-        
-        float isoX = (t.x - t.z) * (TILE_WIDTH / 2f);
-        float isoY = (t.x + t.z) * (TILE_HEIGHT / 2f);
-        float heightOffset = t.y * 8f; 
-        
-        float drawX = isoX + (TILE_WIDTH - 16)/2f;
-        float drawY = isoY + heightOffset; 
-        
-        Color old = batch.getColor();
-        // Combine existing batch alpha with tint
-        batch.setColor(tint.r, tint.g, tint.b, old.a);
-        
-        batch.draw(tex, drawX, drawY);
-        
-        batch.setColor(old); // Restore
+        modelBatch.render(instance, environment);
     }
 
     public void dispose() {
-        batch.dispose();
-        TextureFactory.dispose();
-        EntityTextureFactory.dispose();
+        modelBatch.dispose();
+        if (terrainModel != null) terrainModel.dispose();
+        if (skierModel != null) skierModel.dispose();
+        if (liftPylonModel != null) liftPylonModel.dispose();
+        if (cursorModel != null) cursorModel.dispose();
     }
 }
-

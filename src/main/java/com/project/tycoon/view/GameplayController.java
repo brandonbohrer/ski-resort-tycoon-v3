@@ -10,10 +10,8 @@ import com.project.tycoon.ecs.Entity;
 import com.project.tycoon.ecs.components.LiftComponent;
 import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.simulation.TycoonSimulation;
-import com.project.tycoon.view.util.IsoUtils;
 import com.project.tycoon.world.model.Tile;
-
-import com.project.tycoon.view.LiftBuilder.LiftPreview; // Add Import
+import com.project.tycoon.view.LiftBuilder.LiftPreview;
 
 /**
  * Handles gameplay input (Selection, Terrain modification).
@@ -28,7 +26,7 @@ public class GameplayController extends InputAdapter {
 
     private final TycoonSimulation simulation;
     private final OrthographicCamera camera;
-    private final MousePicker mousePicker; // Add MousePicker
+    private final MousePicker mousePicker; 
     
     private InteractionMode currentMode = InteractionMode.TERRAIN;
     
@@ -45,7 +43,7 @@ public class GameplayController extends InputAdapter {
     public GameplayController(TycoonSimulation simulation, OrthographicCamera camera) {
         this.simulation = simulation;
         this.camera = camera;
-        this.mousePicker = new MousePicker(simulation.getWorldMap());
+        this.mousePicker = new MousePicker(simulation.getWorldMap(), camera); // Pass camera
     }
     
     @Override
@@ -100,11 +98,15 @@ public class GameplayController extends InputAdapter {
     private void handleInteraction(Tile tile) {
         if (currentMode == InteractionMode.TERRAIN) {
              // Modify Terrain
+            int newHeight = tile.getHeight();
             if (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT)) {
-                tile.setHeight(tile.getHeight() - 1);
+                newHeight--;
             } else {
-                tile.setHeight(tile.getHeight() + 1);
+                newHeight++;
             }
+            // Use WorldMap setter to trigger dirty flag for renderer update
+            simulation.getWorldMap().setTileHeight(hoveredX, hoveredZ, newHeight);
+            
         } else if (currentMode == InteractionMode.BUILD) {
             if (!isBuildingLift) {
                 // START BUILDING
@@ -137,8 +139,8 @@ public class GameplayController extends InputAdapter {
     }
 
     private void updateHoveredTile(int screenX, int screenY) {
-        Vector3 worldPos = camera.unproject(new Vector3(screenX, screenY, 0));
-        Vector2 gridPos = mousePicker.pickTile(worldPos.x, worldPos.y);
+        // Use new 3D picking
+        Vector2 gridPos = mousePicker.pickTile(screenX, screenY);
         
         if (gridPos != null) {
             this.hoveredX = (int) gridPos.x;
@@ -155,4 +157,3 @@ public class GameplayController extends InputAdapter {
     public InteractionMode getCurrentMode() { return currentMode; }
     public LiftPreview getCurrentPreview() { return currentPreview; }
 }
-

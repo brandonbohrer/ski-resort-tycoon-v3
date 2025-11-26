@@ -34,14 +34,17 @@ public class TycoonGame extends Game {
         float w = Gdx.graphics.getWidth();
         float h = Gdx.graphics.getHeight();
 
-        // Zoom out a bit to see more tiles (30 units wide is about 1 tile since we drew 32px tiles)
-        // Let's make the viewport much larger relative to our tile size
-        camera = new OrthographicCamera();
-        camera.setToOrtho(false, w, h);
+        // Setup 3D Isometric Camera
+        // Viewport size determines how much of the world we see.
+        float viewportSize = 100f; // Increased to see more
+        camera = new OrthographicCamera(viewportSize, viewportSize * (h / w));
         
-        // Center camera on map start (approx)
-        camera.position.set(0, 0, 0);
-        camera.zoom = 2.0f; // Start zoomed out
+        // Position at isometric angle looking at the CENTER of the map
+        float mapCenter = 128f; // Map is 256x256
+        camera.position.set(mapCenter + 100f, 100f, mapCenter + 100f); 
+        camera.lookAt(mapCenter, 0f, mapCenter);
+        camera.near = 1f;
+        camera.far = 3000f; // Draw distance
         camera.update();
         
         cameraController = new CameraController(camera);
@@ -76,7 +79,8 @@ public class TycoonGame extends Game {
         cameraController.update();
 
         // 2. Render
-        ScreenUtils.clear(Color.BLACK);
+        // Clear Color AND Depth buffer (Required for 3D)
+        ScreenUtils.clear(Color.SKY, true);
         
         // Pass gameplay controller to renderer to draw selection cursor
         boolean isBuildMode = gameplayController.getCurrentMode() == GameplayController.InteractionMode.BUILD;
