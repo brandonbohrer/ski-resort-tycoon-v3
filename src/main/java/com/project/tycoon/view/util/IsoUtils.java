@@ -2,33 +2,37 @@ package com.project.tycoon.view.util;
 
 import com.badlogic.gdx.math.Vector2;
 
+/**
+ * Pure mathematical conversions between Grid Space and World (Render) Space.
+ * Does NOT handle picking logic or height offsets.
+ */
 public class IsoUtils {
     
-    // Reduced tile size for higher resolution look (16x8)
     public static final float TILE_WIDTH = 16f;
     public static final float TILE_HEIGHT = 8f;
+    public static final float HEIGHT_SCALE = 8f; // Pixels per height unit
 
     /**
-     * Converts grid coordinates (integer x, z) to world coordinates (rendering position).
+     * Project Grid(x, z) to Cartesian(x, y) for rendering (Base position, H=0).
      */
     public static Vector2 gridToWorld(int x, int z) {
         float isoX = (x - z) * (TILE_WIDTH / 2f);
         float isoY = (x + z) * (TILE_HEIGHT / 2f);
         return new Vector2(isoX, isoY);
     }
+    
+    /**
+     * Gets the visual Y offset for a given height.
+     */
+    public static float getHeightOffset(int height) {
+        return height * HEIGHT_SCALE;
+    }
 
     /**
-     * Converts world coordinates (from unprojected mouse position) to grid coordinates.
-     * Note: This assumes Flat terrain (y=0). Height complicates picking significantly.
-     * For a tycoon game, we typically pick at "base height" or raycast against bounding boxes.
-     * 
-     * Simplification: We will pick based on the flat plane.
+     * Helper: Converts World(x, y) to Grid(x, z) assuming H=0.
+     * Useful for finding the center of the search area.
      */
-    public static Vector2 worldToGrid(float worldX, float worldY) {
-        // Reverse the formulas:
-        // x = (worldY / (H/2) + worldX / (W/2)) / 2
-        // z = (worldY / (H/2) - worldX / (W/2)) / 2
-        
+    public static Vector2 worldToFlatGrid(float worldX, float worldY) {
         float halfW = TILE_WIDTH / 2f;
         float halfH = TILE_HEIGHT / 2f;
 
@@ -38,4 +42,3 @@ public class IsoUtils {
         return new Vector2(x, z);
     }
 }
-

@@ -31,6 +31,20 @@ public class EntityTextureFactory {
         return cache.get("pylon");
     }
     
+    public static Texture getSkierTexture() {
+        if (!cache.containsKey("skier")) {
+            // Simple 4x8 pixel red skier
+            Pixmap p = new Pixmap(4, 8, Pixmap.Format.RGBA8888);
+            p.setColor(Color.RED);
+            p.fillRectangle(0, 0, 4, 8);
+            
+            Texture t = new Texture(p);
+            p.dispose();
+            cache.put("skier", t);
+        }
+        return cache.get("skier");
+    }
+
     public static void dispose() {
         for (Texture t : cache.values()) {
             t.dispose();

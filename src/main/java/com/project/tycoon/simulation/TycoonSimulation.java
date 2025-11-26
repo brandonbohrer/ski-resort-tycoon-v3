@@ -1,8 +1,17 @@
 package com.project.tycoon.simulation;
 
 import com.project.tycoon.ecs.Engine;
-import com.project.tycoon.world.model.TerrainGenerator; // Add import
+import com.project.tycoon.ecs.Entity;
+import com.project.tycoon.ecs.components.SkierComponent;
+import com.project.tycoon.ecs.components.TransformComponent;
+import com.project.tycoon.ecs.components.VelocityComponent;
+import com.project.tycoon.ecs.systems.PhysicsSystem;
+import com.project.tycoon.ecs.systems.SkierBehaviorSystem;
+import com.project.tycoon.world.model.TerrainGenerator;
+import com.project.tycoon.world.model.Tile;
 import com.project.tycoon.world.model.WorldMap;
+
+import java.util.Random;
 
 /**
  * The concrete simulation implementation for the Ski Resort Tycoon.
@@ -21,8 +30,33 @@ public class TycoonSimulation implements Simulation {
         // Generate Mountain Terrain
         TerrainGenerator.generateMountain(this.worldMap);
         
-        // We will add systems here later, e.g.:
-        // ecsEngine.addSystem(new MovementSystem());
+        // Register Systems
+        ecsEngine.addSystem(new SkierBehaviorSystem(ecsEngine, worldMap));
+        ecsEngine.addSystem(new PhysicsSystem(ecsEngine));
+        
+        spawnTestSkiers();
+    }
+    
+    private void spawnTestSkiers() {
+        Random rand = new Random();
+        // Spawn at the "Peak" area (roughly x=128, z=250)
+        for (int i = 0; i < 50; i++) {
+            Entity skier = ecsEngine.createEntity();
+            
+            int startX = 128 + rand.nextInt(40) - 20;
+            int startZ = 240 + rand.nextInt(10);
+            
+            // Clamp to map
+            if (startX < 0) startX = 0; if (startX >= 256) startX = 255;
+            if (startZ < 0) startZ = 0; if (startZ >= 256) startZ = 255;
+            
+            Tile t = worldMap.getTile(startX, startZ);
+            float h = (t != null) ? t.getHeight() : 0;
+            
+            ecsEngine.addComponent(skier, new TransformComponent(startX, h, startZ));
+            ecsEngine.addComponent(skier, new VelocityComponent(0, 0, 0));
+            ecsEngine.addComponent(skier, new SkierComponent());
+        }
     }
 
     @Override

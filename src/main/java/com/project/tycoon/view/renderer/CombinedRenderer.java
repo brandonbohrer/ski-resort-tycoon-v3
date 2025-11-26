@@ -14,6 +14,8 @@ import com.project.tycoon.view.LiftBuilder.LiftPreview;
 import com.badlogic.gdx.graphics.Color; // Import Color
 import com.project.tycoon.view.util.IsoUtils; // Import shared utils
 
+import com.project.tycoon.ecs.components.SkierComponent; // Add Skier import
+
 /**
  * Handles rendering of both Tiles and Entities, sorted by depth.
  * Replaces the simple WorldRenderer.
@@ -48,10 +50,14 @@ public class CombinedRenderer {
         
         // --- RENDER ENTITIES ---
         for (Entity entity : ecsEngine.getEntities()) {
-            if (ecsEngine.hasComponent(entity, TransformComponent.class) && 
-                ecsEngine.hasComponent(entity, LiftComponent.class)) {
+            if (ecsEngine.hasComponent(entity, TransformComponent.class)) {
                 TransformComponent transform = ecsEngine.getComponent(entity, TransformComponent.class);
-                drawLift(transform, Color.WHITE); // Draw normal lift
+                
+                if (ecsEngine.hasComponent(entity, LiftComponent.class)) {
+                    drawLift(transform, Color.WHITE);
+                } else if (ecsEngine.hasComponent(entity, SkierComponent.class)) {
+                    drawSkier(transform);
+                }
             }
         }
         
@@ -102,6 +108,20 @@ public class CombinedRenderer {
         }
     }
     
+    private void drawSkier(TransformComponent t) {
+        Texture tex = EntityTextureFactory.getSkierTexture();
+        
+        float isoX = (t.x - t.z) * (TILE_WIDTH / 2f);
+        float isoY = (t.x + t.z) * (TILE_HEIGHT / 2f);
+        float heightOffset = t.y * 8f;
+        
+        // Center the skier (4x8 px)
+        float drawX = isoX + (TILE_WIDTH - 4)/2f;
+        float drawY = isoY + heightOffset;
+        
+        batch.draw(tex, drawX, drawY);
+    }
+
     private void drawLift(TransformComponent t, Color tint) {
         Texture tex = EntityTextureFactory.getLiftPylonTexture();
         

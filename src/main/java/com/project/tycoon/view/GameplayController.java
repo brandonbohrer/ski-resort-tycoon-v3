@@ -28,6 +28,7 @@ public class GameplayController extends InputAdapter {
 
     private final TycoonSimulation simulation;
     private final OrthographicCamera camera;
+    private final MousePicker mousePicker; // Add MousePicker
     
     private InteractionMode currentMode = InteractionMode.TERRAIN;
     
@@ -44,6 +45,7 @@ public class GameplayController extends InputAdapter {
     public GameplayController(TycoonSimulation simulation, OrthographicCamera camera) {
         this.simulation = simulation;
         this.camera = camera;
+        this.mousePicker = new MousePicker(simulation.getWorldMap());
     }
     
     @Override
@@ -136,11 +138,16 @@ public class GameplayController extends InputAdapter {
 
     private void updateHoveredTile(int screenX, int screenY) {
         Vector3 worldPos = camera.unproject(new Vector3(screenX, screenY, 0));
-        Vector2 gridPos = IsoUtils.worldToGrid(worldPos.x, worldPos.y);
+        Vector2 gridPos = mousePicker.pickTile(worldPos.x, worldPos.y);
         
-        // Floor to get integer grid indices
-        this.hoveredX = (int) Math.floor(gridPos.x);
-        this.hoveredZ = (int) Math.floor(gridPos.y);
+        if (gridPos != null) {
+            this.hoveredX = (int) gridPos.x;
+            this.hoveredZ = (int) gridPos.y;
+        } else {
+            // Invalid or off-map
+            this.hoveredX = -1;
+            this.hoveredZ = -1;
+        }
     }
 
     public int getHoveredX() { return hoveredX; }
