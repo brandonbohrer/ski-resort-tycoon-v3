@@ -1,0 +1,144 @@
+package com.project.tycoon.view.renderer;
+
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g3d.Environment;
+import com.badlogic.gdx.graphics.g3d.Material;
+import com.badlogic.gdx.graphics.g3d.Model;
+import com.badlogic.gdx.graphics.g3d.ModelBatch;
+import com.badlogic.gdx.graphics.g3d.ModelInstance;
+import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
+import com.badlogic.gdx.math.Quaternion;
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
+import com.project.tycoon.ecs.Engine;
+import com.project.tycoon.ecs.Entity;
+import com.project.tycoon.ecs.components.LiftComponent;
+import com.project.tycoon.ecs.components.SkierComponent;
+import com.project.tycoon.ecs.components.TransformComponent;
+import com.project.tycoon.view.util.IsoUtils;
+import com.project.tycoon.view.LiftBuilder.LiftPreview;
+import com.project.tycoon.world.model.Tile;
+import com.project.tycoon.world.model.WorldMap;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+public class EntityRenderer {
+
+    private final Engine ecsEngine;
+    private final RenderAssetManager assets;
+    private final WorldMap worldMap; // For height lookups for cursor/preview
+    
+    public EntityRenderer(Engine ecsEngine, WorldMap worldMap, RenderAssetManager assets) {
+        this.ecsEngine = ecsEngine;
+        this.worldMap = worldMap;
+        this.assets = assets;
+    }
+    
+    public void render(ModelBatch batch, Environment environment, int hoveredX, int hoveredZ, boolean isBuildMode, LiftPreview preview) {
+        // Cache Transforms
+        Map<UUID, TransformComponent> transformCache = new HashMap<>();
+        for (Entity entity : ecsEngine.getEntities()) {
+            if (ecsEngine.hasComponent(entity, TransformComponent.class)) {
+                transformCache.put(entity.getId(), ecsEngine.getComponent(entity, TransformComponent.class));
+            }
+        }
+        
+        // Render Entities & Cables
+        for (Entity entity : ecsEngine.getEntities()) {
+            if (ecsEngine.hasComponent(entity, TransformComponent.class)) {
+                TransformComponent t = ecsEngine.getComponent(entity, TransformComponent.class);
+                
+                float drawX = t.x;
+                float drawZ = t.z;
+                float drawY = t.y * IsoUtils.HEIGHT_SCALE; 
+                
+                if (ecsEngine.hasComponent(entity, LiftComponent.class)) {
+                    renderModelAt(batch, environment, assets.liftPylonModel, drawX, drawY, drawZ, Color.WHITE);
+                    
+                    // Draw Cable
+                    LiftComponent lift = ecsEngine.getComponent(entity, LiftComponent.class);
+                    if (lift.nextPylonId != null && transformCache.containsKey(lift.nextPylonId)) {
+                        TransformComponent next = transformCache.get(lift.nextPylonId);
+                        drawCable(batch, environment, t, next);
+                    }
+                    
+                } else if (ecsEngine.hasComponent(entity, SkierComponent.class)) {
+                    renderModelAt(batch, environment, assets.skierModel, drawX, drawY, drawZ, Color.WHITE);
+                }
+            }
+        }
+        
+        // Render Cursor
+        if (hoveredX >= 0 && hoveredZ >= 0) {
+            Tile t = worldMap.getTile(hoveredX, hoveredZ);
+            if (t != null) {
+                float h = t.getHeight() * IsoUtils.HEIGHT_SCALE;
+                Color cursorColor = isBuildMode ? Color.BLUE : Color.YELLOW;
+                renderModelAt(batch, environment, assets.cursorModel, hoveredX, h + 0.1f, hoveredZ, cursorColor); 
+            }
+        }
+        
+        // Render Lift Preview
+        if (preview != null && !preview.pylonPositions.isEmpty()) {
+            Color ghostColor = preview.isValid ? Color.GREEN : Color.RED;
+            for (Vector2 pos : preview.pylonPositions) {
+                int x = (int)pos.x;
+                int z = (int)pos.y;
+                Tile t = worldMap.getTile(x, z);
+                float h = (t != null) ? t.getHeight() * IsoUtils.HEIGHT_SCALE : 0;
+                renderModelAt(batch, environment, assets.liftPylonModel, x, h, z, ghostColor);
+            }
+        }
+    }
+    
+    private void drawCable(ModelBatch batch, Environment env, TransformComponent start, TransformComponent end) {
+        float startY = start.y * IsoUtils.HEIGHT_SCALE + 2.8f; // Top of pylon
+        float endY = end.y * IsoUtils.HEIGHT_SCALE + 2.8f;
+        
+        Vector3 p1 = new Vector3(start.x + 0.5f, startY, start.z + 0.5f);
+        Vector3 p2 = new Vector3(end.x + 0.5f, endY, end.z + 0.5f);
+        
+        Vector3 direction = new Vector3(p2).sub(p1);
+        float length = direction.len();
+        
+        Vector3 mid = new Vector3(p1).add(p2).scl(0.5f);
+        
+        ModelInstance cable = new ModelInstance(assets.cableModel);
+        cable.transform.setToTranslation(mid);
+        
+        Vector3 dirNorm = direction.cpy().nor();
+        Vector3 axis = new Vector3(Vector3.Z).crs(dirNorm).nor();
+        float dot = Vector3.Z.dot(dirNorm);
+        float angle = (float) Math.toDegrees(Math.acos(dot));
+        
+        if (axis.len2() < 0.001f) {
+            if (dot < 0) cable.transform.rotate(Vector3.X, 180); 
+        } else {
+            cable.transform.rotate(axis, angle);
+        }
+        
+        cable.transform.scale(1f, 1f, length);
+        
+        batch.render(cable, env);
+        
+        // Chair
+        ModelInstance chair = new ModelInstance(assets.skierModel); 
+        chair.transform.setToTranslation(mid.x, mid.y - 0.5f, mid.z);
+        chair.transform.scale(0.8f, 0.8f, 0.8f); 
+        batch.render(chair, env);
+    }
+    
+    private void renderModelAt(ModelBatch batch, Environment env, Model model, float x, float y, float z, Color tint) {
+        ModelInstance instance = new ModelInstance(model);
+        instance.transform.setToTranslation(x + 0.5f, y, z + 0.5f); 
+        
+        if (!tint.equals(Color.WHITE)) {
+             for (Material m : instance.materials) {
+                 m.set(ColorAttribute.createDiffuse(tint));
+             }
+        }
+        batch.render(instance, env);
+    }
+}
