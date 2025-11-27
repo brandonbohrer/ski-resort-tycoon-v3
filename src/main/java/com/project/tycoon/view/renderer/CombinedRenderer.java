@@ -57,6 +57,9 @@ public class CombinedRenderer {
     private Model treeModel1; 
     private Model treeModel2; 
     private Model rockModel;
+    
+    // Trail Marker
+    private Model trailMarkerModel;
 
     public CombinedRenderer(WorldMap worldMap, Engine ecsEngine) {
         this.worldMap = worldMap;
@@ -133,6 +136,14 @@ public class CombinedRenderer {
         rockModel = mb.createSphere(1f, 0.8f, 1f, 4, 4, 
             new Material(ColorAttribute.createDiffuse(Color.GRAY)),
             Usage.Position | Usage.Normal);
+            
+        // Trail Marker (Orange Cylinder)
+        mb.begin();
+        mb.node().id = "pole";
+        mb.part("pole", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+            new Material(ColorAttribute.createDiffuse(Color.WHITE)))
+            .cylinder(0.1f, 0.5f, 0.1f, 6);
+        trailMarkerModel = mb.end();
     }
 
     private void buildTerrainModel() {
@@ -172,7 +183,7 @@ public class CombinedRenderer {
                         float h4 = worldMap.getTile(x, z+1).getHeight() * IsoUtils.HEIGHT_SCALE;
                         
                         Tile tile = worldMap.getTile(x, z);
-                        builder.setColor(getTerrainColor(tile.getType(), h1));
+                        builder.setColor(getTerrainColor(tile, h1));
                         
                         p1.set(x, h1, z);
                         p2.set(x+1, h2, z);
@@ -193,8 +204,11 @@ public class CombinedRenderer {
         terrainInstance = new ModelInstance(terrainModel);
     }
     
-    private Color getTerrainColor(TerrainType type, float height) {
-        switch(type) {
+    private Color getTerrainColor(Tile tile, float height) {
+        if (tile.isTrail()) {
+            return new Color(0.95f, 0.98f, 1.0f, 1f); // Groomed Snow (Cleaner/Brighter)
+        }
+        switch(tile.getType()) {
             case SNOW: return new Color(0.9f, 0.95f, 1.0f, 1f);
             case GRASS: return new Color(0.2f, 0.6f, 0.1f, 1f); 
             case ROCK: return Color.GRAY;
@@ -219,13 +233,20 @@ public class CombinedRenderer {
         for (int z = 0; z < worldMap.getDepth(); z++) {
             for (int x = 0; x < worldMap.getWidth(); x++) {
                 Tile t = worldMap.getTile(x, z);
+                float h = t.getHeight() * IsoUtils.HEIGHT_SCALE;
+                
+                // Render Decorations
                 if (t.getDecoration() != Decoration.NONE) {
-                    float h = t.getHeight() * IsoUtils.HEIGHT_SCALE;
                     Model model = rockModel;
                     if (t.getDecoration() == Decoration.TREE) {
                         model = ((x + z) % 3 == 0) ? treeModel2 : treeModel1; 
                     }
                     renderModelAt(model, x, h, z, Color.WHITE);
+                }
+                
+                // Render Trail Borders
+                if (t.isTrail()) {
+                     renderTrailBorders(x, z);
                 }
             }
         }
@@ -286,6 +307,47 @@ public class CombinedRenderer {
         modelBatch.end();
     }
     
+    private void renderTrailBorders(int x, int z) {
+        float h00 = getH(x, z);
+        float h10 = getH(x+1, z);
+        float h01 = getH(x, z+1);
+        float h11 = getH(x+1, z+1);
+        
+        // North (z-1)
+        if (isNotTrail(x, z-1)) renderMarker(x + 0.5f, (h00 + h10)*0.5f, z); 
+        // South (z+1)
+        if (isNotTrail(x, z+1)) renderMarker(x + 0.5f, (h01 + h11)*0.5f, z + 1f);
+        // West (x-1)
+        if (isNotTrail(x-1, z)) renderMarker(x, (h00 + h01)*0.5f, z + 0.5f);
+        // East (x+1)
+        if (isNotTrail(x+1, z)) renderMarker(x + 1f, (h10 + h11)*0.5f, z + 0.5f);
+    }
+
+    private float getH(int x, int z) {
+        Tile t = worldMap.getTile(x, z);
+        return (t != null) ? t.getHeight() * IsoUtils.HEIGHT_SCALE : 0;
+    }
+    
+    private boolean isNotTrail(int x, int z) {
+        if (x < 0 || z < 0 || x >= worldMap.getWidth() || z >= worldMap.getDepth()) return true;
+        return !worldMap.getTile(x, z).isTrail();
+    }
+    
+    private void renderMarker(float x, float y, float z) {
+        ModelInstance marker = new ModelInstance(trailMarkerModel);
+        marker.transform.setToTranslation(x, y + 0.25f, z); 
+        
+        // Alternating Color based on position
+        boolean isOrange = ((int)(x + z)) % 2 == 0;
+        Color c = isOrange ? Color.ORANGE : Color.BLACK;
+        
+        for (Material m : marker.materials) {
+            m.set(ColorAttribute.createDiffuse(c));
+        }
+        
+        modelBatch.render(marker, environment);
+    }
+
     private void drawCable(TransformComponent start, TransformComponent end) {
         float startY = start.y * IsoUtils.HEIGHT_SCALE + 2.8f; // Top of pylon
         float endY = end.y * IsoUtils.HEIGHT_SCALE + 2.8f;
@@ -355,5 +417,6 @@ public class CombinedRenderer {
         if (treeModel2 != null) treeModel2.dispose();
         if (rockModel != null) rockModel.dispose();
         if (cableModel != null) cableModel.dispose();
+        if (trailMarkerModel != null) trailMarkerModel.dispose();
     }
 }

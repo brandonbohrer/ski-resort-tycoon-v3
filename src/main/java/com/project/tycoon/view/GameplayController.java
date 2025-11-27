@@ -13,6 +13,8 @@ import com.project.tycoon.simulation.TycoonSimulation;
 import com.project.tycoon.world.model.Tile;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
 
+import com.project.tycoon.ecs.components.TrailComponent; // Add Import
+
 /**
  * Handles gameplay input (Selection, Terrain modification).
  * Separated from CameraController to keep logic clean.
@@ -21,7 +23,8 @@ public class GameplayController extends InputAdapter {
 
     public enum InteractionMode {
         TERRAIN,
-        BUILD
+        BUILD,
+        TRAIL // New Mode
     }
 
     private final TycoonSimulation simulation;
@@ -39,6 +42,10 @@ public class GameplayController extends InputAdapter {
     private int buildStartX = -1;
     private int buildStartZ = -1;
     private LiftPreview currentPreview = null;
+    
+    // Trail Building State
+    private boolean isPaintingTrail = false;
+    private Entity currentTrailEntity = null;
 
     public GameplayController(TycoonSimulation simulation, OrthographicCamera camera) {
         this.simulation = simulation;
@@ -49,8 +56,19 @@ public class GameplayController extends InputAdapter {
     @Override
     public boolean keyUp(int keycode) {
         if (keycode == Input.Keys.B) {
-            currentMode = (currentMode == InteractionMode.TERRAIN) ? InteractionMode.BUILD : InteractionMode.TERRAIN;
-            // Reset state on switch
+            currentMode = InteractionMode.BUILD;
+            isBuildingLift = false;
+            currentPreview = null;
+            System.out.println("Switched to Mode: " + currentMode);
+            return true;
+        } else if (keycode == Input.Keys.T) { // Trail Mode
+            currentMode = InteractionMode.TRAIL;
+            isBuildingLift = false;
+            currentPreview = null;
+            System.out.println("Switched to Mode: " + currentMode);
+            return true;
+        } else if (keycode == Input.Keys.M) { // Back to Terrain/Move
+            currentMode = InteractionMode.TERRAIN;
             isBuildingLift = false;
             currentPreview = null;
             System.out.println("Switched to Mode: " + currentMode);
@@ -70,7 +88,46 @@ public class GameplayController extends InputAdapter {
     public boolean touchDragged(int screenX, int screenY, int pointer) {
          updateHoveredTile(screenX, screenY);
          updateLiftPreview();
+         
+         if (currentMode == InteractionMode.TRAIL && isPaintingTrail) {
+             paintTrailTile();
+         }
+         
          return false;
+    }
+    
+    private void paintTrailTile() {
+        int radius = 2; // Brush Radius (Diameter ~5)
+        
+        for (int z = hoveredZ - radius; z <= hoveredZ + radius; z++) {
+            for (int x = hoveredX - radius; x <= hoveredX + radius; x++) {
+                // Circular Brush
+                float dx = x - hoveredX;
+                float dz = z - hoveredZ;
+                if (dx*dx + dz*dz > (radius + 0.5f) * (radius + 0.5f)) continue; // +0.5 for smoother circle
+
+                Tile tile = simulation.getWorldMap().getTile(x, z);
+                if (tile != null && !tile.isTrail()) {
+                    // Add to component
+                    if (currentTrailEntity != null) {
+                        TrailComponent trail = simulation.getEcsEngine().getComponent(currentTrailEntity, TrailComponent.class);
+                        
+                        // Check if already added to this specific trail entity
+                        boolean exists = false;
+                        for(Vector2 v : trail.tiles) { if((int)v.x == x && (int)v.y == z) { exists = true; break; } }
+                        
+                        if (!exists) {
+                            trail.addTile(x, z);
+                            
+                            // Modify World
+                            tile.setTrail(true);
+                            tile.setDecoration(com.project.tycoon.world.model.Decoration.NONE); // Clear trees
+                            simulation.getWorldMap().setTile(x, z, tile); // Updates dirty flag
+                        }
+                    }
+                }
+            }
+        }
     }
     
     private void updateLiftPreview() {
@@ -88,9 +145,28 @@ public class GameplayController extends InputAdapter {
             
             Tile tile = simulation.getWorldMap().getTile(hoveredX, hoveredZ);
             if (tile != null) {
-                handleInteraction(tile);
+                if (currentMode == InteractionMode.TRAIL) {
+                    // Start new trail
+                    isPaintingTrail = true;
+                    currentTrailEntity = simulation.getEcsEngine().createEntity();
+                    simulation.getEcsEngine().addComponent(currentTrailEntity, new TrailComponent());
+                    paintTrailTile(); // Paint initial tile
+                } else {
+                    handleInteraction(tile);
+                }
                 return true;
             }
+        }
+        return false;
+    }
+    
+    @Override
+    public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+        if (currentMode == InteractionMode.TRAIL && isPaintingTrail) {
+            isPaintingTrail = false;
+            currentTrailEntity = null;
+            System.out.println("Trail Finished");
+            return true;
         }
         return false;
     }

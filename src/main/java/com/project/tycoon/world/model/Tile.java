@@ -8,10 +8,19 @@ public class Tile {
     private TerrainType type;
     private Decoration decoration = Decoration.NONE;
     private int height; // Elevation level
+    private boolean isTrail = false;
 
     public Tile(TerrainType type, int height) {
         this.type = type;
         this.height = height;
+    }
+
+    public boolean isTrail() {
+        return isTrail;
+    }
+
+    public void setTrail(boolean trail) {
+        isTrail = trail;
     }
 
     public TerrainType getType() {
