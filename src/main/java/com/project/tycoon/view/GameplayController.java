@@ -240,5 +240,11 @@ public class GameplayController extends InputAdapter {
     public int getHoveredX() { return hoveredX; }
     public int getHoveredZ() { return hoveredZ; }
     public InteractionMode getCurrentMode() { return currentMode; }
+    public void setMode(InteractionMode mode) {
+        this.currentMode = mode;
+        this.isBuildingLift = false;
+        this.currentPreview = null;
+        System.out.println("Mode set to: " + mode);
+    }
     public LiftPreview getCurrentPreview() { return currentPreview; }
 }

@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.project.tycoon.simulation.TycoonSimulation;
 import com.project.tycoon.view.renderer.CombinedRenderer;
+import com.project.tycoon.view.ui.GameHUD; // Import
 
 /**
  * The visual entry point of the game (LibGDX adapter).
@@ -17,6 +18,7 @@ public class TycoonGame extends Game {
 
     private final TycoonSimulation simulation;
     private CombinedRenderer combinedRenderer;
+    private GameHUD gameHUD; // Add HUD
     private OrthographicCamera camera;
     private CameraController cameraController;
     private GameplayController gameplayController;
@@ -50,10 +52,14 @@ public class TycoonGame extends Game {
         cameraController = new CameraController(camera);
         gameplayController = new GameplayController(simulation, camera);
         
+        // Initialize HUD
+        gameHUD = new GameHUD(gameplayController);
+        
         // Multiplexer to handle both camera and gameplay inputs
         com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();
-        multiplexer.addProcessor(gameplayController); // Gameplay first (clicks)
-        multiplexer.addProcessor(cameraController);   // Camera second (drags/zooms)
+        multiplexer.addProcessor(gameHUD.getStage()); // UI First!
+        multiplexer.addProcessor(gameplayController); // Gameplay second
+        multiplexer.addProcessor(cameraController);   // Camera last
         Gdx.input.setInputProcessor(multiplexer);
         
         combinedRenderer = new CombinedRenderer(simulation.getWorldMap(), simulation.getEcsEngine());
@@ -85,6 +91,9 @@ public class TycoonGame extends Game {
         // Pass gameplay controller to renderer to draw selection cursor
         boolean isBuildMode = gameplayController.getCurrentMode() == GameplayController.InteractionMode.BUILD;
         combinedRenderer.render(camera, gameplayController.getHoveredX(), gameplayController.getHoveredZ(), isBuildMode, gameplayController.getCurrentPreview());
+        
+        // 3. Render UI (On top)
+        gameHUD.render((float)deltaTime);
     }
 
     @Override
@@ -92,12 +101,16 @@ public class TycoonGame extends Game {
         camera.viewportWidth = width;
         camera.viewportHeight = height;
         camera.update();
+        gameHUD.resize(width, height);
     }
     
     @Override
     public void dispose() {
         if (combinedRenderer != null) {
             combinedRenderer.dispose();
+        }
+        if (gameHUD != null) {
+            gameHUD.dispose();
         }
     }
 }
