@@ -14,6 +14,7 @@ import com.badlogic.gdx.graphics.g3d.attributes.IntAttribute;
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder;
 import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder;
+import com.badlogic.gdx.math.Quaternion;
 import com.badlogic.gdx.math.Vector3;
 import com.project.tycoon.ecs.Engine;
 import com.project.tycoon.ecs.Entity;
@@ -26,6 +27,10 @@ import com.project.tycoon.world.model.TerrainType;
 import com.project.tycoon.world.model.WorldMap;
 import com.project.tycoon.view.util.IsoUtils;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Renders the game world using 3D meshes for a smooth "Snowtopia" aesthetic.
@@ -45,10 +50,12 @@ public class CombinedRenderer {
     // Reusable entity models (simple shapes for now)
     private Model skierModel;
     private Model liftPylonModel;
+    private Model cableModel; 
     private Model cursorModel;
     
     // Decoration Models
-    private Model treeModel;
+    private Model treeModel1; 
+    private Model treeModel2; 
     private Model rockModel;
 
     public CombinedRenderer(WorldMap worldMap, Engine ecsEngine) {
@@ -57,10 +64,10 @@ public class CombinedRenderer {
         
         this.modelBatch = new ModelBatch();
         
-        // 1. Setup Lighting
+        // 1. Setup Lighting (Improved)
         this.environment = new Environment();
-        environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.6f, 0.6f, 0.6f, 1f));
-        environment.add(new DirectionalLight().set(0.8f, 0.8f, 0.8f, -1f, -0.8f, -0.2f));
+        environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.4f, 0.4f, 0.4f, 1f));
+        environment.add(new DirectionalLight().set(1.0f, 1.0f, 1.0f, -1f, -0.8f, -0.2f));
         
         // 2. Build Models
         buildTerrainModel();
@@ -70,36 +77,59 @@ public class CombinedRenderer {
     private void buildEntityModels() {
         ModelBuilder mb = new ModelBuilder();
         
-        // Skier: Red Box
-        skierModel = mb.createBox(0.4f, 0.8f, 0.4f, 
-            new Material(ColorAttribute.createDiffuse(Color.RED)),
+        // Skier
+        skierModel = mb.createBox(0.5f, 1.0f, 0.5f, 
+            new Material(ColorAttribute.createDiffuse(Color.FIREBRICK)),
             Usage.Position | Usage.Normal);
             
-        // Lift Pylon: Gray Pillar
+        // Lift Pylon
         liftPylonModel = mb.createBox(0.2f, 3.0f, 0.2f, 
             new Material(ColorAttribute.createDiffuse(Color.GRAY)),
             Usage.Position | Usage.Normal);
+            
+        // Cable: Box along Z axis
+        mb.begin();
+        mb.node().id = "cable";
+        mb.part("cable", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+            new Material(
+                ColorAttribute.createDiffuse(Color.BLACK),
+                new IntAttribute(IntAttribute.CullFace, 0) // Disable culling to ensure visibility
+            ))
+            .box(0.1f, 0.1f, 1.0f);
+        cableModel = mb.end();
 
-        // Cursor: Semi-transparent Blue Box
+        // Cursor
         cursorModel = mb.createBox(1.0f, 0.1f, 1.0f,
             new Material(ColorAttribute.createDiffuse(new Color(0f, 0f, 1f, 0.5f))),
             Usage.Position | Usage.Normal);
             
-        // Tree: Cone + Cylinder
+        // Tree 1
         mb.begin();
         mb.node().id = "trunk";
         mb.part("trunk", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal, 
             new Material(ColorAttribute.createDiffuse(Color.BROWN)))
             .cylinder(0.2f, 1f, 0.2f, 6);
-            
         mb.node().id = "leaves";
-        mb.node().translation.set(0, 0.5f, 0); // Stack on trunk
+        mb.node().translation.set(0, 0.5f, 0);
         mb.part("leaves", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
             new Material(ColorAttribute.createDiffuse(Color.FOREST)))
             .cone(1f, 2f, 1f, 8);
-        treeModel = mb.end();
+        treeModel1 = mb.end();
         
-        // Rock: Low Poly Sphere
+        // Tree 2
+        mb.begin();
+        mb.node().id = "trunk";
+        mb.part("trunk", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal, 
+            new Material(ColorAttribute.createDiffuse(Color.BROWN)))
+            .cylinder(0.2f, 1f, 0.2f, 6);
+        mb.node().id = "leaves";
+        mb.node().translation.set(0, 0.5f, 0);
+        mb.part("leaves", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+            new Material(ColorAttribute.createDiffuse(new Color(0.8f, 0.9f, 0.8f, 1f))))
+            .cone(1.2f, 1.8f, 1.2f, 8);
+        treeModel2 = mb.end();
+        
+        // Rock
         rockModel = mb.createSphere(1f, 0.8f, 1f, 4, 4, 
             new Material(ColorAttribute.createDiffuse(Color.GRAY)),
             Usage.Position | Usage.Normal);
@@ -127,7 +157,7 @@ public class CombinedRenderer {
                     Usage.Position | Usage.ColorPacked | Usage.Normal, 
                     new Material(
                         ColorAttribute.createDiffuse(Color.WHITE), 
-                        new IntAttribute(IntAttribute.CullFace, 0) // Disable Culling (Double Sided)
+                        new IntAttribute(IntAttribute.CullFace, 0)
                     )
                 );
                 
@@ -136,27 +166,21 @@ public class CombinedRenderer {
 
                 for (int z = cz; z < endZ; z++) {
                     for (int x = cx; x < endX; x++) {
-                        // Get Heights
                         float h1 = worldMap.getTile(x, z).getHeight() * IsoUtils.HEIGHT_SCALE;
                         float h2 = worldMap.getTile(x+1, z).getHeight() * IsoUtils.HEIGHT_SCALE;
                         float h3 = worldMap.getTile(x+1, z+1).getHeight() * IsoUtils.HEIGHT_SCALE;
                         float h4 = worldMap.getTile(x, z+1).getHeight() * IsoUtils.HEIGHT_SCALE;
                         
-                        // Set Color based on tile type (Always Snow now, but logic remains)
                         Tile tile = worldMap.getTile(x, z);
                         builder.setColor(getTerrainColor(tile.getType(), h1));
                         
-                        // Define Vertices
                         p1.set(x, h1, z);
                         p2.set(x+1, h2, z);
                         p3.set(x+1, h3, z+1);
                         p4.set(x, h4, z+1);
                         
-                        // Simple normal calc for p1-p2-p4 triangle
                         Vector3 u = new Vector3(p2).sub(p1);
                         Vector3 v = new Vector3(p4).sub(p1);
-                        
-                        // Fix: (v cross u) points UP.
                         Vector3 faceNorm = v.crs(u).nor(); 
                         
                         builder.rect(p1, p2, p3, p4, faceNorm);
@@ -171,7 +195,7 @@ public class CombinedRenderer {
     
     private Color getTerrainColor(TerrainType type, float height) {
         switch(type) {
-            case SNOW: return Color.WHITE;
+            case SNOW: return new Color(0.9f, 0.95f, 1.0f, 1f);
             case GRASS: return new Color(0.2f, 0.6f, 0.1f, 1f); 
             case ROCK: return Color.GRAY;
             case DIRT: return new Color(0.5f, 0.3f, 0.1f, 1f);
@@ -180,7 +204,6 @@ public class CombinedRenderer {
     }
 
     public void render(OrthographicCamera camera, int hoveredX, int hoveredZ, boolean isBuildMode, LiftPreview preview) {
-        // Check for map updates
         if (worldMap.isDirty()) {
             if (terrainModel != null) terrainModel.dispose();
             buildTerrainModel();
@@ -189,24 +212,33 @@ public class CombinedRenderer {
 
         modelBatch.begin(camera);
         
-        // 1. Render Terrain
         if (terrainInstance != null) {
              modelBatch.render(terrainInstance, environment);
         }
         
-        // 2. Render Decorations
         for (int z = 0; z < worldMap.getDepth(); z++) {
             for (int x = 0; x < worldMap.getWidth(); x++) {
                 Tile t = worldMap.getTile(x, z);
                 if (t.getDecoration() != Decoration.NONE) {
                     float h = t.getHeight() * IsoUtils.HEIGHT_SCALE;
-                    Model model = (t.getDecoration() == Decoration.TREE) ? treeModel : rockModel;
+                    Model model = rockModel;
+                    if (t.getDecoration() == Decoration.TREE) {
+                        model = ((x + z) % 3 == 0) ? treeModel2 : treeModel1; 
+                    }
                     renderModelAt(model, x, h, z, Color.WHITE);
                 }
             }
         }
         
-        // 3. Render Entities
+        // Cache Transforms
+        Map<UUID, TransformComponent> transformCache = new HashMap<>();
+        for (Entity entity : ecsEngine.getEntities()) {
+            if (ecsEngine.hasComponent(entity, TransformComponent.class)) {
+                transformCache.put(entity.getId(), ecsEngine.getComponent(entity, TransformComponent.class));
+            }
+        }
+        
+        // Render Entities & Cables
         for (Entity entity : ecsEngine.getEntities()) {
             if (ecsEngine.hasComponent(entity, TransformComponent.class)) {
                 TransformComponent t = ecsEngine.getComponent(entity, TransformComponent.class);
@@ -217,23 +249,29 @@ public class CombinedRenderer {
                 
                 if (ecsEngine.hasComponent(entity, LiftComponent.class)) {
                     renderModelAt(liftPylonModel, drawX, drawY, drawZ, Color.WHITE);
+                    
+                    // Draw Cable
+                    LiftComponent lift = ecsEngine.getComponent(entity, LiftComponent.class);
+                    if (lift.nextPylonId != null && transformCache.containsKey(lift.nextPylonId)) {
+                        TransformComponent next = transformCache.get(lift.nextPylonId);
+                        drawCable(t, next);
+                    }
+                    
                 } else if (ecsEngine.hasComponent(entity, SkierComponent.class)) {
                     renderModelAt(skierModel, drawX, drawY, drawZ, Color.WHITE);
                 }
             }
         }
         
-        // 4. Render Cursor
         if (hoveredX >= 0 && hoveredZ >= 0) {
             Tile t = worldMap.getTile(hoveredX, hoveredZ);
             if (t != null) {
                 float h = t.getHeight() * IsoUtils.HEIGHT_SCALE;
                 Color cursorColor = isBuildMode ? Color.BLUE : Color.YELLOW;
-                renderModelAt(cursorModel, hoveredX, h + 0.1f, hoveredZ, cursorColor); // Lift slightly
+                renderModelAt(cursorModel, hoveredX, h + 0.1f, hoveredZ, cursorColor); 
             }
         }
         
-        // 5. Render Preview (Ghosts)
         if (preview != null && !preview.pylonPositions.isEmpty()) {
             Color ghostColor = preview.isValid ? Color.GREEN : Color.RED;
             for (com.badlogic.gdx.math.Vector2 pos : preview.pylonPositions) {
@@ -248,17 +286,57 @@ public class CombinedRenderer {
         modelBatch.end();
     }
     
-    private void renderModelAt(Model model, float x, float y, float z, Color tint) {
-        // Note: Creating ModelInstance every frame is garbage-heavy.
-        ModelInstance instance = new ModelInstance(model);
-        instance.transform.setToTranslation(x + 0.5f, y, z + 0.5f); // Center in tile
+    private void drawCable(TransformComponent start, TransformComponent end) {
+        float startY = start.y * IsoUtils.HEIGHT_SCALE + 2.8f; // Top of pylon
+        float endY = end.y * IsoUtils.HEIGHT_SCALE + 2.8f;
         
-        // Only apply tint if not WHITE (to preserve texture/material colors of Trees)
+        Vector3 p1 = new Vector3(start.x + 0.5f, startY, start.z + 0.5f);
+        Vector3 p2 = new Vector3(end.x + 0.5f, endY, end.z + 0.5f);
+        
+        Vector3 direction = new Vector3(p2).sub(p1);
+        float length = direction.len();
+        
+        Vector3 mid = new Vector3(p1).add(p2).scl(0.5f);
+        
+        ModelInstance cable = new ModelInstance(cableModel);
+        // Manual Rotation Logic to avoid Matrix4.lookAt issues
+        cable.transform.setToTranslation(mid);
+        
+        // Rotate 'Z' to align with 'direction'
+        // Default Z is (0,0,1)
+        Vector3 dirNorm = direction.cpy().nor();
+        // Cross product gives axis of rotation
+        Vector3 axis = new Vector3(Vector3.Z).crs(dirNorm).nor();
+        // Dot product gives angle
+        float dot = Vector3.Z.dot(dirNorm);
+        // Angle in degrees
+        float angle = (float) Math.toDegrees(Math.acos(dot));
+        
+        // If parallel (angle 0) or opposite (angle 180), cross product is zero.
+        // Handle edge cases if needed, but lifts are rarely vertical.
+        if (axis.len2() < 0.001f) {
+            // Parallel or anti-parallel
+            if (dot < 0) cable.transform.rotate(Vector3.X, 180); // Flip if opposite
+        } else {
+            cable.transform.rotate(axis, angle);
+        }
+        
+        cable.transform.scale(1f, 1f, length);
+        
+        modelBatch.render(cable, environment);
+        
+        // Chair
+        ModelInstance chair = new ModelInstance(skierModel); 
+        chair.transform.setToTranslation(mid.x, mid.y - 0.5f, mid.z);
+        chair.transform.scale(0.8f, 0.8f, 0.8f); 
+        modelBatch.render(chair, environment);
+    }
+    
+    private void renderModelAt(Model model, float x, float y, float z, Color tint) {
+        ModelInstance instance = new ModelInstance(model);
+        instance.transform.setToTranslation(x + 0.5f, y, z + 0.5f); 
+        
         if (!tint.equals(Color.WHITE)) {
-             // Applying tint to a model with multiple nodes/materials might require iterating materials
-             // For simple single-color models, getting(0) works.
-             // For Tree (2 parts), we might tint both parts if we use this.
-             // Since decorations use Color.WHITE, this block is skipped for them, preserving Green/Brown.
              for (Material m : instance.materials) {
                  m.set(ColorAttribute.createDiffuse(tint));
              }
@@ -273,7 +351,9 @@ public class CombinedRenderer {
         if (skierModel != null) skierModel.dispose();
         if (liftPylonModel != null) liftPylonModel.dispose();
         if (cursorModel != null) cursorModel.dispose();
-        if (treeModel != null) treeModel.dispose();
+        if (treeModel1 != null) treeModel1.dispose();
+        if (treeModel2 != null) treeModel2.dispose();
         if (rockModel != null) rockModel.dispose();
+        if (cableModel != null) cableModel.dispose();
     }
 }

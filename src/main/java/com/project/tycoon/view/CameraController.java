@@ -15,7 +15,7 @@ public class CameraController extends InputAdapter {
     private int lastScreenX, lastScreenY;
     private boolean isDragging = false;
 
-    private static final float MIN_ZOOM = 0.1f;
+    private static final float MIN_ZOOM = 0.02f; // Allow very close zoom
     private static final float MAX_ZOOM = 4.0f;
     private static final float ZOOM_SPEED = 0.1f;
     

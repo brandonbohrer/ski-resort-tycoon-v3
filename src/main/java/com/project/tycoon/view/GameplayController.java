@@ -119,6 +119,7 @@ public class GameplayController extends InputAdapter {
                 isBuildingLift = false;
                 
                 if (currentPreview != null && currentPreview.isValid) {
+                    Entity prevPylon = null;
                     for (Vector2 pos : currentPreview.pylonPositions) {
                          Entity pylon = simulation.getEcsEngine().createEntity();
                          
@@ -129,7 +130,15 @@ public class GameplayController extends InputAdapter {
                          int ph = (t != null) ? t.getHeight() : 0;
 
                          simulation.getEcsEngine().addComponent(pylon, new TransformComponent(px, ph, pz));
-                         simulation.getEcsEngine().addComponent(pylon, new LiftComponent(LiftComponent.LiftType.CHAIRLIFT));
+                         LiftComponent liftComp = new LiftComponent(LiftComponent.LiftType.CHAIRLIFT);
+                         simulation.getEcsEngine().addComponent(pylon, liftComp);
+                         
+                         if (prevPylon != null) {
+                             // Link previous to current
+                             simulation.getEcsEngine().getComponent(prevPylon, LiftComponent.class).nextPylonId = pylon.getId();
+                             System.out.println("Linked Pylon " + prevPylon.getId() + " to " + pylon.getId());
+                         }
+                         prevPylon = pylon;
                     }
                     System.out.println("Lift Built!");
                 }
