@@ -2,10 +2,11 @@ package com.project.tycoon.world.model;
 
 /**
  * Represents a single cell in the world grid.
- * Contains terrain data and elevation.
+ * Contains terrain data, elevation, and objects.
  */
 public class Tile {
     private TerrainType type;
+    private Decoration decoration = Decoration.NONE;
     private int height; // Elevation level
 
     public Tile(TerrainType type, int height) {
@@ -20,6 +21,14 @@ public class Tile {
     public void setType(TerrainType type) {
         this.type = type;
     }
+    
+    public Decoration getDecoration() {
+        return decoration;
+    }
+
+    public void setDecoration(Decoration decoration) {
+        this.decoration = decoration;
+    }
 
     public int getHeight() {
         return height;
@@ -29,4 +38,3 @@ public class Tile {
         this.height = height;
     }
 }
-

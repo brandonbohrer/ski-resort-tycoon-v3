@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.g3d.Model;
 import com.badlogic.gdx.graphics.g3d.ModelBatch;
 import com.badlogic.gdx.graphics.g3d.ModelInstance;
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
+import com.badlogic.gdx.graphics.g3d.attributes.IntAttribute;
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder;
 import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder;
@@ -19,13 +20,12 @@ import com.project.tycoon.ecs.Entity;
 import com.project.tycoon.ecs.components.LiftComponent;
 import com.project.tycoon.ecs.components.SkierComponent;
 import com.project.tycoon.ecs.components.TransformComponent;
+import com.project.tycoon.world.model.Decoration;
 import com.project.tycoon.world.model.Tile;
 import com.project.tycoon.world.model.TerrainType;
 import com.project.tycoon.world.model.WorldMap;
 import com.project.tycoon.view.util.IsoUtils;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
-
-import com.badlogic.gdx.graphics.g3d.attributes.IntAttribute; // Import IntAttribute
 
 /**
  * Renders the game world using 3D meshes for a smooth "Snowtopia" aesthetic.
@@ -46,6 +46,10 @@ public class CombinedRenderer {
     private Model skierModel;
     private Model liftPylonModel;
     private Model cursorModel;
+    
+    // Decoration Models
+    private Model treeModel;
+    private Model rockModel;
 
     public CombinedRenderer(WorldMap worldMap, Engine ecsEngine) {
         this.worldMap = worldMap;
@@ -80,6 +84,25 @@ public class CombinedRenderer {
         cursorModel = mb.createBox(1.0f, 0.1f, 1.0f,
             new Material(ColorAttribute.createDiffuse(new Color(0f, 0f, 1f, 0.5f))),
             Usage.Position | Usage.Normal);
+            
+        // Tree: Cone + Cylinder
+        mb.begin();
+        mb.node().id = "trunk";
+        mb.part("trunk", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal, 
+            new Material(ColorAttribute.createDiffuse(Color.BROWN)))
+            .cylinder(0.2f, 1f, 0.2f, 6);
+            
+        mb.node().id = "leaves";
+        mb.node().translation.set(0, 0.5f, 0); // Stack on trunk
+        mb.part("leaves", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+            new Material(ColorAttribute.createDiffuse(Color.FOREST)))
+            .cone(1f, 2f, 1f, 8);
+        treeModel = mb.end();
+        
+        // Rock: Low Poly Sphere
+        rockModel = mb.createSphere(1f, 0.8f, 1f, 4, 4, 
+            new Material(ColorAttribute.createDiffuse(Color.GRAY)),
+            Usage.Position | Usage.Normal);
     }
 
     private void buildTerrainModel() {
@@ -94,7 +117,6 @@ public class CombinedRenderer {
         Vector3 p2 = new Vector3();
         Vector3 p3 = new Vector3();
         Vector3 p4 = new Vector3();
-        Vector3 norm = new Vector3(0, 1, 0);
 
         for (int cz = 0; cz < depth - 1; cz += chunkSize) {
             for (int cx = 0; cx < width - 1; cx += chunkSize) {
@@ -120,7 +142,7 @@ public class CombinedRenderer {
                         float h3 = worldMap.getTile(x+1, z+1).getHeight() * IsoUtils.HEIGHT_SCALE;
                         float h4 = worldMap.getTile(x, z+1).getHeight() * IsoUtils.HEIGHT_SCALE;
                         
-                        // Set Color based on tile type
+                        // Set Color based on tile type (Always Snow now, but logic remains)
                         Tile tile = worldMap.getTile(x, z);
                         builder.setColor(getTerrainColor(tile.getType(), h1));
                         
@@ -134,7 +156,7 @@ public class CombinedRenderer {
                         Vector3 u = new Vector3(p2).sub(p1);
                         Vector3 v = new Vector3(p4).sub(p1);
                         
-                        // Fix: (v cross u) points UP. (u cross v) pointed DOWN.
+                        // Fix: (v cross u) points UP.
                         Vector3 faceNorm = v.crs(u).nor(); 
                         
                         builder.rect(p1, p2, p3, p4, faceNorm);
@@ -150,7 +172,7 @@ public class CombinedRenderer {
     private Color getTerrainColor(TerrainType type, float height) {
         switch(type) {
             case SNOW: return Color.WHITE;
-            case GRASS: return new Color(0.2f, 0.6f, 0.1f, 1f); // Forest Green
+            case GRASS: return new Color(0.2f, 0.6f, 0.1f, 1f); 
             case ROCK: return Color.GRAY;
             case DIRT: return new Color(0.5f, 0.3f, 0.1f, 1f);
             default: return Color.WHITE;
@@ -172,7 +194,19 @@ public class CombinedRenderer {
              modelBatch.render(terrainInstance, environment);
         }
         
-        // 2. Render Entities
+        // 2. Render Decorations
+        for (int z = 0; z < worldMap.getDepth(); z++) {
+            for (int x = 0; x < worldMap.getWidth(); x++) {
+                Tile t = worldMap.getTile(x, z);
+                if (t.getDecoration() != Decoration.NONE) {
+                    float h = t.getHeight() * IsoUtils.HEIGHT_SCALE;
+                    Model model = (t.getDecoration() == Decoration.TREE) ? treeModel : rockModel;
+                    renderModelAt(model, x, h, z, Color.WHITE);
+                }
+            }
+        }
+        
+        // 3. Render Entities
         for (Entity entity : ecsEngine.getEntities()) {
             if (ecsEngine.hasComponent(entity, TransformComponent.class)) {
                 TransformComponent t = ecsEngine.getComponent(entity, TransformComponent.class);
@@ -189,7 +223,7 @@ public class CombinedRenderer {
             }
         }
         
-        // 3. Render Cursor
+        // 4. Render Cursor
         if (hoveredX >= 0 && hoveredZ >= 0) {
             Tile t = worldMap.getTile(hoveredX, hoveredZ);
             if (t != null) {
@@ -199,7 +233,7 @@ public class CombinedRenderer {
             }
         }
         
-        // 4. Render Preview (Ghosts)
+        // 5. Render Preview (Ghosts)
         if (preview != null && !preview.pylonPositions.isEmpty()) {
             Color ghostColor = preview.isValid ? Color.GREEN : Color.RED;
             for (com.badlogic.gdx.math.Vector2 pos : preview.pylonPositions) {
@@ -219,7 +253,16 @@ public class CombinedRenderer {
         ModelInstance instance = new ModelInstance(model);
         instance.transform.setToTranslation(x + 0.5f, y, z + 0.5f); // Center in tile
         
-        instance.materials.get(0).set(ColorAttribute.createDiffuse(tint));
+        // Only apply tint if not WHITE (to preserve texture/material colors of Trees)
+        if (!tint.equals(Color.WHITE)) {
+             // Applying tint to a model with multiple nodes/materials might require iterating materials
+             // For simple single-color models, getting(0) works.
+             // For Tree (2 parts), we might tint both parts if we use this.
+             // Since decorations use Color.WHITE, this block is skipped for them, preserving Green/Brown.
+             for (Material m : instance.materials) {
+                 m.set(ColorAttribute.createDiffuse(tint));
+             }
+        }
         
         modelBatch.render(instance, environment);
     }
@@ -230,5 +273,7 @@ public class CombinedRenderer {
         if (skierModel != null) skierModel.dispose();
         if (liftPylonModel != null) liftPylonModel.dispose();
         if (cursorModel != null) cursorModel.dispose();
+        if (treeModel != null) treeModel.dispose();
+        if (rockModel != null) rockModel.dispose();
     }
 }

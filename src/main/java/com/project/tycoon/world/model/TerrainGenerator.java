@@ -4,63 +4,75 @@ import java.util.Random;
 
 public class TerrainGenerator {
 
-    // Simple Pseudo-Random Noise
-    // In a real engine, we'd use SimplexNoise or PerlinNoise
-    
     public static void generateMountain(WorldMap map) {
         int width = map.getWidth();
         int depth = map.getDepth();
-        Random random = new Random(12345); // Fixed seed for reproducibility
+        Random random = new Random(12345); // Fixed seed
 
-        // Base Slope: Orient so "Top" of screen (High Z + High X in iso projection?)
-        // Isometric Z is depth. 
-        // Let's make the center-back (High Z) the peak.
-        
         for (int z = 0; z < depth; z++) {
             for (int x = 0; x < width; x++) {
+                Tile tile = map.getTile(x, z);
                 
-                // Peak at Center-Back (x=Width/2, z=Depth)
-                // Base at Front (z=0)
+                // 1. Terrain Type: ALWAYS SNOW (as requested)
+                tile.setType(TerrainType.SNOW);
                 
-                // Normalized Z (0 to 1)
-                // We invert Z so 0 (Front) is Low, Depth (Back) is High.
-                // Wait, in Isometric +Z is usually South (Foreground). 
-                // Camera is at +Z looking at -Z.
-                // So if we want Mountain at Top (Background, -Z), we want High Height at Low Z.
-                // So normZ should be 1.0 at z=0, and 0.0 at z=depth.
+                // 2. Height Generation
+                // Z=0 is Back (Peak), Z=Depth is Front (Base)
                 float normZ = 1.0f - (float)z / depth; 
                 
-                // Distance from center X
-                float distX = Math.abs(x - width/2f) / (width/2f); // 0 at center, 1 at edges
+                // Flat base logic: Flat for the first ~30% (Front), then rises
+                float mountainRise = 0.0f;
+                if (normZ > 0.25f) {
+                    // Rescale range [0.25, 1.0] to [0.0, 1.0]
+                    float t = (normZ - 0.25f) / 0.75f;
+                    // Exponential rise creates a steep peak effect
+                    mountainRise = (float)Math.pow(t, 2.0f) * 80.0f; 
+                }
                 
-                // Mountain Shape: Height increases with Z, decreases with distance from center X
-                float baseHeight = (normZ * 40f) * (1.0f - distX * 0.5f);
+                // Subpeaks / Hilly Noise
+                // Combining sines to create larger lumps (subpeaks)
+                float largeHills = (float)(Math.sin(x * 0.03f) + Math.cos(z * 0.04f)) * 8.0f;
                 
-                // 2. Noise (The "Roughness")
-                // Simple smooth noise simulation using sin waves
-                float noise = (float) (Math.sin(x * 0.05f) + Math.cos(z * 0.05f)) * 4.0f;
-                float detail = (float) (Math.sin(x * 0.15f + z * 0.1f)) * 1.5f;
+                // Detail Noise
+                float detail = (float)(Math.sin(x * 0.1f + z * 0.15f)) * 2.0f;
                 
-                int finalHeight = (int) (baseHeight + noise + detail);
-                if (finalHeight < 0) finalHeight = 0;
+                // Center Bias: Make the mountain taper off to the sides (X axis)
+                float distX = Math.abs(x - width/2f) / (width/2f); // 0 center, 1 edge
+                float xMask = 1.0f - (float)Math.pow(distX, 1.5f); // Curve to keep center high
                 
-                Tile tile = map.getTile(x, z);
+                float combinedHeight = (mountainRise + largeHills + detail) * xMask;
+                
+                // Ensure base is flat-ish but allows small variation
+                if (normZ <= 0.25f) {
+                    combinedHeight = detail * 0.5f; // Just little bumps at base
+                }
+                
+                int finalHeight = (int) Math.max(0, combinedHeight);
                 tile.setHeight(finalHeight);
                 
-                // 3. Biomes (Terrain Painting)
-                // Adjusted thresholds for new height scale
-                if (finalHeight >= 30) {
-                    tile.setType(TerrainType.SNOW);
-                } else if (finalHeight >= 20) {
-                    if (random.nextBoolean()) tile.setType(TerrainType.ROCK);
-                    else tile.setType(TerrainType.SNOW);
-                } else if (finalHeight >= 10) {
-                    tile.setType(TerrainType.GRASS);
-                } else {
-                    tile.setType(TerrainType.DIRT);
+                // 3. Vegetation & Rocks
+                // Trees: Randomly placed below 'Treeline' (height < 50)
+                // Rocks: Randomly placed anywhere, more common higher up
+                
+                tile.setDecoration(Decoration.NONE); // Reset
+                
+                // Probability checks
+                float r = random.nextFloat();
+                
+                if (finalHeight < 50 && finalHeight > 1) {
+                    // Tree Zone
+                    if (r < 0.03f) { // 3% chance
+                        tile.setDecoration(Decoration.TREE);
+                    } else if (r < 0.04f) { // 1% chance (overlapping range)
+                        tile.setDecoration(Decoration.ROCK);
+                    }
+                } else if (finalHeight >= 50) {
+                    // Alpine Zone (Rocks only)
+                    if (r < 0.05f) {
+                        tile.setDecoration(Decoration.ROCK);
+                    }
                 }
             }
         }
     }
 }
-
