@@ -12,6 +12,7 @@ public class Engine {
 
     /**
      * Creates and registers a new entity.
+     * 
      * @return The created Entity.
      */
     public Entity createEntity() {
@@ -19,6 +20,20 @@ public class Engine {
         entities.add(entity);
         components.put(entity.getId(), new HashMap<>());
         return entity;
+    }
+
+    /**
+     * Removes an entity and all its components from the engine.
+     * 
+     * @param entity The entity to remove.
+     * @throws IllegalArgumentException if the entity does not exist.
+     */
+    public void removeEntity(Entity entity) {
+        if (!entities.contains(entity)) {
+            throw new IllegalArgumentException("Entity does not exist in this engine.");
+        }
+        entities.remove(entity);
+        components.remove(entity.getId());
     }
 
     /**
@@ -32,6 +47,22 @@ public class Engine {
     }
 
     /**
+     * Removes a component from an entity.
+     * 
+     * @param entity         The entity to remove the component from.
+     * @param componentClass The class of the component to remove.
+     * @return The removed component, or null if not found.
+     * @throws IllegalArgumentException if the entity does not exist.
+     */
+    public <T extends Component> T removeComponent(Entity entity, Class<T> componentClass) {
+        if (!entities.contains(entity)) {
+            throw new IllegalArgumentException("Entity does not exist in this engine.");
+        }
+        Component removed = components.get(entity.getId()).remove(componentClass);
+        return componentClass.cast(removed);
+    }
+
+    /**
      * Retrieves a component of a specific type for an entity.
      */
     public <T extends Component> T getComponent(Entity entity, Class<T> componentClass) {
@@ -40,14 +71,15 @@ public class Engine {
         }
         return componentClass.cast(components.get(entity.getId()).get(componentClass));
     }
-    
+
     /**
      * Checks if an entity has a component.
      */
-     public boolean hasComponent(Entity entity, Class<? extends Component> componentClass) {
-        if (!entities.contains(entity)) return false;
+    public boolean hasComponent(Entity entity, Class<? extends Component> componentClass) {
+        if (!entities.contains(entity))
+            return false;
         return components.get(entity.getId()).containsKey(componentClass);
-     }
+    }
 
     /**
      * Registers a system to be updated by the engine.
@@ -58,6 +90,7 @@ public class Engine {
 
     /**
      * Updates all registered systems.
+     * 
      * @param dt Time delta.
      */
     public void update(double dt) {
@@ -65,7 +98,7 @@ public class Engine {
             system.update(dt);
         }
     }
-    
+
     /**
      * Returns a view of all entities.
      */
@@ -73,4 +106,3 @@ public class Engine {
         return Collections.unmodifiableSet(entities);
     }
 }
-
