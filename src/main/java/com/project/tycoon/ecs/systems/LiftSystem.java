@@ -7,6 +7,7 @@ import com.project.tycoon.ecs.components.LiftComponent;
 import com.project.tycoon.ecs.components.SkierComponent;
 import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.ecs.components.VelocityComponent;
+import com.project.tycoon.economy.EconomyManager;
 
 import java.util.*;
 
@@ -17,6 +18,7 @@ import java.util.*;
 public class LiftSystem implements System {
 
     private final Engine engine;
+    private final EconomyManager economy;
 
     // Queue per lift: Map<liftBaseEntityId, List<skierEntityId>>
     private final Map<UUID, List<UUID>> liftQueues = new HashMap<>();
@@ -28,8 +30,9 @@ public class LiftSystem implements System {
     // Detection radius for lift base
     private static final float QUEUE_DETECTION_RADIUS = 5.0f;
 
-    public LiftSystem(Engine engine) {
+    public LiftSystem(Engine engine, EconomyManager economy) {
         this.engine = engine;
+        this.economy = economy;
     }
 
     @Override
@@ -45,6 +48,9 @@ public class LiftSystem implements System {
 
         // 4. Release skiers at top
         releaseSkiers();
+
+        // 5. Deduct maintenance costs
+        deductMaintenanceCosts((float) dt);
     }
 
     /**
@@ -109,6 +115,21 @@ public class LiftSystem implements System {
                 continue;
             }
 
+            // Check capacity before boarding
+            Entity liftBase = findEntityById(liftId);
+            if (liftBase == null)
+                continue;
+
+            LiftComponent liftComp = engine.getComponent(liftBase, LiftComponent.class);
+            if (liftComp == null)
+                continue;
+
+            int currentRiders = countRidersOnLift(liftId);
+            if (currentRiders >= liftComp.capacity) {
+                // Lift is at capacity, cannot board more
+                continue;
+            }
+
             // Update boarding timer
             float timer = boardingTimers.getOrDefault(liftId, 0f);
             timer += dt;
@@ -122,8 +143,6 @@ public class LiftSystem implements System {
                     SkierComponent skier = engine.getComponent(skierEntity, SkierComponent.class);
                     TransformComponent skierPos = engine.getComponent(skierEntity, TransformComponent.class);
 
-                    // Find lift base entity
-                    Entity liftBase = findEntityById(liftId);
                     if (liftBase != null) {
                         TransformComponent liftPos = engine.getComponent(liftBase, TransformComponent.class);
 
@@ -137,6 +156,9 @@ public class LiftSystem implements System {
                         // Transition to RIDING_LIFT
                         skier.state = SkierComponent.State.RIDING_LIFT;
                         skier.targetLiftId = liftId;
+
+                        // Charge ticket revenue
+                        economy.addRevenue(EconomyManager.TICKET_PRICE);
                     }
                 }
 
@@ -356,5 +378,36 @@ public class LiftSystem implements System {
             }
         }
         return null;
+    }
+
+    /**
+     * Count how many skiers are currently riding a specific lift.
+     */
+    private int countRidersOnLift(UUID liftId) {
+        int count = 0;
+        for (Entity entity : engine.getEntities()) {
+            if (engine.hasComponent(entity, SkierComponent.class)) {
+                SkierComponent skier = engine.getComponent(entity, SkierComponent.class);
+                if (skier.state == SkierComponent.State.RIDING_LIFT &&
+                        liftId.equals(skier.targetLiftId)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Deduct maintenance costs from all active lifts.
+     */
+    private void deductMaintenanceCosts(float dt) {
+        Map<UUID, Entity> liftBases = findLiftBases();
+        for (Entity liftBase : liftBases.values()) {
+            LiftComponent lift = engine.getComponent(liftBase, LiftComponent.class);
+            if (lift != null) {
+                float cost = lift.maintenanceCostPerSec * dt;
+                economy.deductExpense(cost);
+            }
+        }
     }
 }

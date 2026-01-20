@@ -22,7 +22,7 @@ public class TycoonGame extends Game {
     private OrthographicCamera camera;
     private CameraController cameraController;
     private GameplayController gameplayController;
-    
+
     // Simulation timing accumulator
     private double accumulator = 0.0;
     private final double TIME_STEP = 1.0 / 60.0;
@@ -40,28 +40,28 @@ public class TycoonGame extends Game {
         // Viewport size determines how much of the world we see.
         float viewportSize = 100f; // Increased to see more
         camera = new OrthographicCamera(viewportSize, viewportSize * (h / w));
-        
+
         // Position at isometric angle looking at the CENTER of the map
         float mapCenter = 128f; // Map is 256x256
-        camera.position.set(mapCenter + 100f, 100f, mapCenter + 100f); 
+        camera.position.set(mapCenter + 100f, 100f, mapCenter + 100f);
         camera.lookAt(mapCenter, 0f, mapCenter);
         camera.near = 1f;
         camera.far = 3000f; // Draw distance
         camera.update();
-        
+
         cameraController = new CameraController(camera);
         gameplayController = new GameplayController(simulation, camera);
-        
+
         // Initialize HUD
-        gameHUD = new GameHUD(gameplayController);
-        
+        gameHUD = new GameHUD(gameplayController, simulation.getEconomyManager());
+
         // Multiplexer to handle both camera and gameplay inputs
         com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();
         multiplexer.addProcessor(gameHUD.getStage()); // UI First!
         multiplexer.addProcessor(gameplayController); // Gameplay second
-        multiplexer.addProcessor(cameraController);   // Camera last
+        multiplexer.addProcessor(cameraController); // Camera last
         Gdx.input.setInputProcessor(multiplexer);
-        
+
         combinedRenderer = new CombinedRenderer(simulation.getWorldMap(), simulation.getEcsEngine());
     }
 
@@ -69,15 +69,17 @@ public class TycoonGame extends Game {
     public void render() {
         // 1. Update Simulation (Fixed Timestep)
         double deltaTime = Gdx.graphics.getDeltaTime();
-        
+
         // Cap dt to avoid spiral of death
-        if (deltaTime > 0.25) deltaTime = 0.25;
-        
+        if (deltaTime > 0.25)
+            deltaTime = 0.25;
+
         accumulator += deltaTime;
-        
+
         while (accumulator >= TIME_STEP) {
-            // We use a dummy tick number for now, but simulation tracks its own state mostly
-            simulation.tick(0); 
+            // We use a dummy tick number for now, but simulation tracks its own state
+            // mostly
+            simulation.tick(0);
             accumulator -= TIME_STEP;
         }
 
@@ -87,13 +89,14 @@ public class TycoonGame extends Game {
         // 2. Render
         // Clear Color AND Depth buffer (Required for 3D)
         ScreenUtils.clear(Color.SKY, true);
-        
+
         // Pass gameplay controller to renderer to draw selection cursor
         boolean isBuildMode = gameplayController.getCurrentMode() == GameplayController.InteractionMode.BUILD;
-        combinedRenderer.render(camera, gameplayController.getHoveredX(), gameplayController.getHoveredZ(), isBuildMode, gameplayController.getCurrentPreview());
-        
+        combinedRenderer.render(camera, gameplayController.getHoveredX(), gameplayController.getHoveredZ(), isBuildMode,
+                gameplayController.getCurrentPreview());
+
         // 3. Render UI (On top)
-        gameHUD.render((float)deltaTime);
+        gameHUD.render((float) deltaTime);
     }
 
     @Override
@@ -103,7 +106,7 @@ public class TycoonGame extends Game {
         camera.update();
         gameHUD.resize(width, height);
     }
-    
+
     @Override
     public void dispose() {
         if (combinedRenderer != null) {
@@ -114,4 +117,3 @@ public class TycoonGame extends Game {
         }
     }
 }
-
