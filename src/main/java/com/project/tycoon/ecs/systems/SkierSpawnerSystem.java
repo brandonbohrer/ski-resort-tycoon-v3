@@ -1,0 +1,107 @@
+package com.project.tycoon.ecs.systems;
+
+import com.project.tycoon.ecs.Engine;
+import com.project.tycoon.ecs.Entity;
+import com.project.tycoon.ecs.System;
+import com.project.tycoon.ecs.components.SkierComponent;
+import com.project.tycoon.ecs.components.TransformComponent;
+import com.project.tycoon.ecs.components.VelocityComponent;
+import com.project.tycoon.world.model.Tile;
+import com.project.tycoon.world.model.WorldMap;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Manages skier population - spawns skiers at the base and despawns them when
+ * finished.
+ */
+public class SkierSpawnerSystem implements System {
+
+    private final Engine engine;
+    private final WorldMap worldMap;
+
+    // Spawning configuration
+    private static final int TARGET_POPULATION = 75;
+    private static final int SPAWN_X = 128; // Center of map
+    private static final int SPAWN_Z = 10; // Bottom of map (base lodge)
+    private static final float SPAWN_INTERVAL = 2.0f; // seconds between spawns
+    private static final int SPAWN_SPREAD = 5; // Random spread around spawn point
+
+    private float timeSinceLastSpawn = 0.0f;
+
+    public SkierSpawnerSystem(Engine engine, WorldMap worldMap) {
+        this.engine = engine;
+        this.worldMap = worldMap;
+    }
+
+    @Override
+    public void update(double dt) {
+        // Count current skiers
+        int skierCount = countSkiers();
+
+        // Despawn finished skiers
+        despawnFinishedSkiers();
+
+        // Spawn new skiers if below target
+        timeSinceLastSpawn += dt;
+        if (skierCount < TARGET_POPULATION && timeSinceLastSpawn >= SPAWN_INTERVAL) {
+            spawnSkier();
+            timeSinceLastSpawn = 0.0f;
+        }
+    }
+
+    private int countSkiers() {
+        int count = 0;
+        for (Entity entity : engine.getEntities()) {
+            if (engine.hasComponent(entity, SkierComponent.class)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private void despawnFinishedSkiers() {
+        List<Entity> toRemove = new ArrayList<>();
+
+        for (Entity entity : engine.getEntities()) {
+            if (engine.hasComponent(entity, SkierComponent.class)) {
+                SkierComponent skier = engine.getComponent(entity, SkierComponent.class);
+                if (skier.state == SkierComponent.State.FINISHED) {
+                    toRemove.add(entity);
+                }
+            }
+        }
+
+        // Remove entities (avoid concurrent modification)
+        for (Entity entity : toRemove) {
+            engine.removeEntity(entity);
+        }
+    }
+
+    private void spawnSkier() {
+        // Random position around spawn point
+        java.util.Random rand = new java.util.Random();
+        int spawnX = SPAWN_X + rand.nextInt(SPAWN_SPREAD * 2) - SPAWN_SPREAD;
+        int spawnZ = SPAWN_Z + rand.nextInt(SPAWN_SPREAD * 2) - SPAWN_SPREAD;
+
+        // Clamp to map bounds
+        spawnX = Math.max(0, Math.min(spawnX, worldMap.getWidth() - 1));
+        spawnZ = Math.max(0, Math.min(spawnZ, worldMap.getDepth() - 1));
+
+        // Get terrain height at spawn
+        Tile tile = worldMap.getTile(spawnX, spawnZ);
+        float height = (tile != null) ? tile.getHeight() : 0;
+
+        // Create skier entity
+        Entity skier = engine.createEntity();
+        engine.addComponent(skier, new TransformComponent(spawnX, height, spawnZ));
+        engine.addComponent(skier, new VelocityComponent(0, 0, 0));
+
+        SkierComponent skierComp = new SkierComponent();
+        skierComp.state = SkierComponent.State.WAITING;
+        skierComp.skillLevel = 0.3f + rand.nextFloat() * 0.7f; // Random skill 0.3-1.0
+        skierComp.stamina = 0.5f + rand.nextFloat() * 0.5f; // Random stamina 0.5-1.0
+        engine.addComponent(skier, skierComp);
+    }
+}
