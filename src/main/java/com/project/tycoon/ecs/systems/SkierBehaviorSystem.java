@@ -36,7 +36,9 @@ public class SkierBehaviorSystem implements System {
                 VelocityComponent vel = engine.getComponent(entity, VelocityComponent.class);
 
                 // Handle different states
-                if (skier.state == SkierComponent.State.SKIING) {
+                if (skier.state == SkierComponent.State.WAITING) {
+                    handleWaitingState(skier, pos, vel);
+                } else if (skier.state == SkierComponent.State.SKIING) {
                     applySlopePhysics(pos, vel);
 
                     // Check if reached bottom (finish line)
@@ -44,9 +46,96 @@ public class SkierBehaviorSystem implements System {
                         skier.state = SkierComponent.State.FINISHED;
                     }
                 }
-                // TODO: Handle other states (WAITING, QUEUED, RIDING_LIFT) in future phases
+                // QUEUED and RIDING_LIFT states are handled by LiftSystem
             }
         }
+    }
+
+    /**
+     * Handle WAITING state - find and move toward nearest lift.
+     */
+    private void handleWaitingState(SkierComponent skier, TransformComponent pos, VelocityComponent vel) {
+        // Find nearest lift base
+        Entity nearestLift = findNearestLiftBase(pos);
+
+        if (nearestLift != null) {
+            skier.targetLiftId = nearestLift.getId();
+            moveTowardLift(pos, vel, nearestLift);
+        } else {
+            // No lift found, stop moving
+            vel.dx = 0;
+            vel.dz = 0;
+        }
+    }
+
+    /**
+     * Find the nearest lift base to the skier.
+     */
+    private Entity findNearestLiftBase(TransformComponent skierPos) {
+        Entity nearest = null;
+        float minDistance = Float.MAX_VALUE;
+
+        // Find all lift base entities (pylons with no incoming links)
+        java.util.Set<java.util.UUID> hasIncoming = new java.util.HashSet<>();
+
+        // First pass: identify all pylons that are pointed to
+        for (Entity entity : engine.getEntities()) {
+            if (engine.hasComponent(entity, com.project.tycoon.ecs.components.LiftComponent.class)) {
+                com.project.tycoon.ecs.components.LiftComponent lift = engine.getComponent(entity,
+                        com.project.tycoon.ecs.components.LiftComponent.class);
+                if (lift.nextPylonId != null) {
+                    hasIncoming.add(lift.nextPylonId);
+                }
+            }
+        }
+
+        // Second pass: find nearest base (pylon with no incoming link)
+        for (Entity entity : engine.getEntities()) {
+            if (engine.hasComponent(entity, com.project.tycoon.ecs.components.LiftComponent.class) &&
+                    !hasIncoming.contains(entity.getId())) {
+
+                TransformComponent liftPos = engine.getComponent(entity, TransformComponent.class);
+                if (liftPos == null)
+                    continue;
+
+                float dx = liftPos.x - skierPos.x;
+                float dz = liftPos.z - skierPos.z;
+                float distance = (float) Math.sqrt(dx * dx + dz * dz);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearest = entity;
+                }
+            }
+        }
+
+        return nearest;
+    }
+
+    /**
+     * Move skier toward the target lift.
+     */
+    private void moveTowardLift(TransformComponent pos, VelocityComponent vel, Entity liftEntity) {
+        TransformComponent liftPos = engine.getComponent(liftEntity, TransformComponent.class);
+        if (liftPos == null)
+            return;
+
+        // Calculate direction to lift
+        float dx = liftPos.x - pos.x;
+        float dz = liftPos.z - pos.z;
+        float distance = (float) Math.sqrt(dx * dx + dz * dz);
+
+        // If already close enough, stop moving
+        if (distance < 2.0f) {
+            vel.dx = 0;
+            vel.dz = 0;
+            return;
+        }
+
+        // Move toward lift at constant speed
+        float speed = 3.0f;
+        vel.dx = (dx / distance) * speed;
+        vel.dz = (dz / distance) * speed;
     }
 
     private void applySlopePhysics(TransformComponent pos, VelocityComponent vel) {

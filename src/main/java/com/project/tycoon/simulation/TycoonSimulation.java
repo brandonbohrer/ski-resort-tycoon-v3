@@ -1,6 +1,7 @@
 package com.project.tycoon.simulation;
 
 import com.project.tycoon.ecs.Engine;
+import com.project.tycoon.ecs.systems.LiftSystem;
 import com.project.tycoon.ecs.systems.PhysicsSystem;
 import com.project.tycoon.ecs.systems.SkierBehaviorSystem;
 import com.project.tycoon.ecs.systems.SkierSpawnerSystem;
@@ -26,6 +27,7 @@ public class TycoonSimulation implements Simulation {
 
         // Register Systems
         ecsEngine.addSystem(new SkierBehaviorSystem(ecsEngine, worldMap));
+        ecsEngine.addSystem(new LiftSystem(ecsEngine));
         ecsEngine.addSystem(new PhysicsSystem(ecsEngine));
         ecsEngine.addSystem(new SkierSpawnerSystem(ecsEngine, worldMap)); // Dynamic spawning
     }
