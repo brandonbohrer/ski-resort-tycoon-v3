@@ -24,7 +24,7 @@ public class SkierSpawnerSystem implements System {
     // Spawning configuration
     private static final int TARGET_POPULATION = 75;
     private static final int SPAWN_X = 128; // Center of map
-    private static final int SPAWN_Z = 250; // Bottom of map (base lodge)
+    public static final int BASE_Z = 250; // Bottom of map (base lodge)
     private static final float SPAWN_INTERVAL = 2.0f; // seconds between spawns
     private static final int SPAWN_SPREAD = 5; // Random spread around spawn point
 
@@ -83,7 +83,7 @@ public class SkierSpawnerSystem implements System {
         // Random position around spawn point
         java.util.Random rand = new java.util.Random();
         int spawnX = SPAWN_X + rand.nextInt(SPAWN_SPREAD * 2) - SPAWN_SPREAD;
-        int spawnZ = SPAWN_Z + rand.nextInt(SPAWN_SPREAD * 2) - SPAWN_SPREAD;
+        int spawnZ = BASE_Z + rand.nextInt(SPAWN_SPREAD * 2) - SPAWN_SPREAD;
 
         // Clamp to map bounds
         spawnX = Math.max(0, Math.min(spawnX, worldMap.getWidth() - 1));

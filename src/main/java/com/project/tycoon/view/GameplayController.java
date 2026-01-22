@@ -5,7 +5,6 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.math.Vector3;
 import com.project.tycoon.ecs.Entity;
 import com.project.tycoon.ecs.components.LiftComponent;
 import com.project.tycoon.ecs.components.TransformComponent;
@@ -29,7 +28,6 @@ public class GameplayController extends InputAdapter {
     }
 
     private final TycoonSimulation simulation;
-    private final OrthographicCamera camera;
     private final MousePicker mousePicker;
     private final EconomyManager economy;
 
@@ -52,7 +50,6 @@ public class GameplayController extends InputAdapter {
 
     public GameplayController(TycoonSimulation simulation, OrthographicCamera camera) {
         this.simulation = simulation;
-        this.camera = camera;
         this.mousePicker = new MousePicker(simulation.getWorldMap(), camera); // Pass camera
         this.economy = simulation.getEconomyManager();
     }
@@ -132,10 +129,27 @@ public class GameplayController extends InputAdapter {
 
                             // Modify World
                             tile.setTrail(true);
-                            tile.setDecoration(com.project.tycoon.world.model.Decoration.NONE); // Clear trees
+                            tile.setDecoration(com.project.tycoon.world.model.Decoration.NONE); // Clear trees/rocks
                             simulation.getWorldMap().setTile(x, z, tile); // Updates dirty flag
+                            clearTrailCorridor(x, z);
                         }
                     }
+                }
+            }
+        }
+    }
+
+    private void clearTrailCorridor(int centerX, int centerZ) {
+        int corridorRadius = 1; // 3x3 area around trail tile
+        for (int z = centerZ - corridorRadius; z <= centerZ + corridorRadius; z++) {
+            for (int x = centerX - corridorRadius; x <= centerX + corridorRadius; x++) {
+                Tile neighbor = simulation.getWorldMap().getTile(x, z);
+                if (neighbor == null) {
+                    continue;
+                }
+                if (neighbor.getDecoration() != com.project.tycoon.world.model.Decoration.NONE) {
+                    neighbor.setDecoration(com.project.tycoon.world.model.Decoration.NONE);
+                    simulation.getWorldMap().setTile(x, z, neighbor);
                 }
             }
         }
