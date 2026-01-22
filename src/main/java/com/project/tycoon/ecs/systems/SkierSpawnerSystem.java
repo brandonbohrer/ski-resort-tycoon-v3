@@ -24,7 +24,7 @@ public class SkierSpawnerSystem implements System {
     // Spawning configuration
     private static final int TARGET_POPULATION = 75;
     private static final int SPAWN_X = 128; // Center of map
-    private static final int SPAWN_Z = 10; // Bottom of map (base lodge)
+    private static final int SPAWN_Z = 250; // Bottom of map (base lodge)
     private static final float SPAWN_INTERVAL = 2.0f; // seconds between spawns
     private static final int SPAWN_SPREAD = 5; // Random spread around spawn point
 
