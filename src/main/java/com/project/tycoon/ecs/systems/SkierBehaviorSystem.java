@@ -54,8 +54,13 @@ public class SkierBehaviorSystem implements System {
 
                     // Check if reached bottom (finish line)
                     if (pos.z >= SkierSpawnerSystem.BASE_Z - 2) {
+                        vel.dx = 0;
+                        vel.dz = 0;
                         skier.state = SkierComponent.State.FINISHED;
                     }
+                } else if (skier.state == SkierComponent.State.FINISHED) {
+                    vel.dx = 0;
+                    vel.dz = 0;
                 }
                 // QUEUED and RIDING_LIFT states are handled by LiftSystem
             }
@@ -72,6 +77,13 @@ public class SkierBehaviorSystem implements System {
 
         Tile current = map.getTile(x, z);
         if (current == null) {
+            return;
+        }
+
+        if (z >= SkierSpawnerSystem.BASE_Z - 2) {
+            vel.dx = 0;
+            vel.dz = 0;
+            skier.state = SkierComponent.State.FINISHED;
             return;
         }
 
