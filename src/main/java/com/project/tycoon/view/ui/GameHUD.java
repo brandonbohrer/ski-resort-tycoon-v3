@@ -97,11 +97,55 @@ public class GameHUD {
         persistentMoneyTicker.pad(15);
 
         tickerMoneyLabel = new Label("", skin, "title");
+        tickerMoneyLabel.setColor(com.badlogic.gdx.graphics.Color.WHITE); // Always white
+
         Table tickerBackground = new Table();
         tickerBackground.setBackground(new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
                 skin.get("dark_gray", com.badlogic.gdx.graphics.Texture.class)));
         tickerBackground.pad(10, 20, 10, 20);
         tickerBackground.add(tickerMoneyLabel);
+
+        // Add hover tooltip
+        final Label tooltipLabel = new Label("", skin);
+        final com.badlogic.gdx.scenes.scene2d.ui.Window tooltipWindow = new com.badlogic.gdx.scenes.scene2d.ui.Window(
+                "", skin);
+        tooltipWindow.add(tooltipLabel).pad(5);
+        tooltipWindow.pack();
+        tooltipWindow.setVisible(false);
+        stage.addActor(tooltipWindow);
+
+        tickerBackground.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override
+            public void enter(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y, int pointer,
+                    com.badlogic.gdx.scenes.scene2d.Actor fromActor) {
+                float dailyProfit = economy.getNetIncomePerSecond() * 86400; // seconds in a day
+                String profitText = String.format("%s$%.0f/day", dailyProfit >= 0 ? "+" : "", dailyProfit);
+                tooltipLabel.setText(profitText);
+                tooltipLabel.setColor(
+                        dailyProfit >= 0 ? com.badlogic.gdx.graphics.Color.GREEN : com.badlogic.gdx.graphics.Color.RED);
+                tooltipWindow.pack();
+                tooltipWindow.setPosition(event.getStageX() - tooltipWindow.getWidth() / 2,
+                        event.getStageY() - tooltipWindow.getHeight() - 10);
+                tooltipWindow.setVisible(true);
+            }
+
+            @Override
+            public void exit(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y, int pointer,
+                    com.badlogic.gdx.scenes.scene2d.Actor toActor) {
+                tooltipWindow.setVisible(false);
+            }
+
+            @Override
+            public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y, int pointer,
+                    int button) {
+                if (button == com.badlogic.gdx.Input.Buttons.LEFT) {
+                    // TODO: Open finances screen
+                    System.out.println("Ticker clicked! Opening finances screen...");
+                    return true;
+                }
+                return false;
+            }
+        });
 
         persistentMoneyTicker.add(tickerBackground);
         stage.addActor(persistentMoneyTicker);
@@ -309,21 +353,11 @@ public class GameHUD {
     // handles it.
 
     public void render(float dt) {
-        // Update persistent money ticker (always visible)
+        // Update persistent money ticker (always visible, white only)
         if (tickerMoneyLabel != null) {
             float money = economy.getCurrentMoney();
             tickerMoneyLabel.setText(String.format("$%.0f", money));
-
-            // Color-code based on money status
-            if (money < 1000) {
-                tickerMoneyLabel.setColor(com.badlogic.gdx.graphics.Color.RED);
-            } else if (economy.getNetIncomePerSecond() > 0) {
-                tickerMoneyLabel.setColor(com.badlogic.gdx.graphics.Color.GREEN);
-            } else if (economy.getNetIncomePerSecond() < 0) {
-                tickerMoneyLabel.setColor(com.badlogic.gdx.graphics.Color.ORANGE);
-            } else {
-                tickerMoneyLabel.setColor(com.badlogic.gdx.graphics.Color.WHITE);
-            }
+            // Color is always white (set in buildUI)
         }
 
         // Update detailed finance panel
