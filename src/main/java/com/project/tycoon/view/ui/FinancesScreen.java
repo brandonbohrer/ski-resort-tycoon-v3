@@ -1,5 +1,7 @@
 package com.project.tycoon.view.ui;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
@@ -9,6 +11,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.project.tycoon.economy.EconomyManager;
 import com.project.tycoon.ecs.Engine;
+import com.project.tycoon.simulation.TycoonSimulation;
 
 /**
  * Fullscreen finances overlay that shows comprehensive financial statistics.
@@ -20,14 +23,16 @@ public class FinancesScreen {
     private final Skin skin;
     private final EconomyManager economy;
     private final Engine engine;
+    private final TycoonSimulation simulation;
 
     private Table mainPanel;
     private boolean visible;
 
-    public FinancesScreen(Skin skin, EconomyManager economy, Engine engine) {
+    public FinancesScreen(Skin skin, EconomyManager economy, Engine engine, TycoonSimulation simulation) {
         this.skin = skin;
         this.economy = economy;
         this.engine = engine;
+        this.simulation = simulation;
         this.stage = new Stage(new ScreenViewport());
         this.visible = false;
 
@@ -82,12 +87,18 @@ public class FinancesScreen {
     public void show() {
         visible = true;
         stage.getRoot().setVisible(true);
+        if (simulation != null) {
+            simulation.setPaused(true);
+        }
         System.out.println("FinancesScreen opened");
     }
 
     public void hide() {
         visible = false;
         stage.getRoot().setVisible(false);
+        if (simulation != null) {
+            simulation.setPaused(false);
+        }
         System.out.println("FinancesScreen closed");
     }
 
@@ -97,6 +108,11 @@ public class FinancesScreen {
 
     public void render(float dt) {
         if (visible) {
+            // Handle ESC key to close
+            if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+                hide();
+            }
+
             stage.act(dt);
             stage.draw();
         }

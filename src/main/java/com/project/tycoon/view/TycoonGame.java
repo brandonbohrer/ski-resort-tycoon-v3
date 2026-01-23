@@ -59,7 +59,7 @@ public class TycoonGame extends Game {
 
         // Initialize Finances Screen
         financesScreen = new FinancesScreen(gameHUD.getSkin(), simulation.getEconomyManager(),
-                simulation.getEcsEngine());
+                simulation.getEcsEngine(), simulation);
         gameHUD.setFinancesScreen(financesScreen);
 
         // Multiplexer to handle both camera and gameplay inputs

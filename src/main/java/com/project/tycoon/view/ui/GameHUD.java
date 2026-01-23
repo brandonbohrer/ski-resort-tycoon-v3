@@ -282,6 +282,18 @@ public class GameHUD {
     private void showCategory(String name) {
         // Special handling for Finances - open fullscreen overlay
         if ("Finances".equals(name)) {
+            // Uncheck all category buttons and hide all toolbars
+            categoryGroup.uncheckAll();
+            for (Table t : toolbars.values()) {
+                t.setVisible(false);
+            }
+
+            // Hide lift types submenu if it's open
+            if (liftTypesToolbar != null) {
+                liftTypesToolbar.setVisible(false);
+            }
+            currentMenuLevel = MenuLevel.MAIN_CATEGORIES;
+
             if (financesScreen != null) {
                 financesScreen.show();
             }

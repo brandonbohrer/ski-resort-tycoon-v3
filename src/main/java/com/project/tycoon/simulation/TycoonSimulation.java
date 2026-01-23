@@ -18,6 +18,7 @@ public class TycoonSimulation implements Simulation {
     private final Engine ecsEngine;
     private final WorldMap worldMap;
     private final EconomyManager economyManager;
+    private boolean paused = false;
 
     public TycoonSimulation() {
         this.ecsEngine = new Engine();
@@ -37,6 +38,11 @@ public class TycoonSimulation implements Simulation {
 
     @Override
     public void tick(long tickNumber) {
+        // Skip updates when paused
+        if (paused) {
+            return;
+        }
+
         // For now, we assume 1 tick = fixed time step (e.g. 1/60s)
         // In a more advanced setup, we might pass the actual dt if variable
         double fixedDt = 1.0 / 60.0;
@@ -54,5 +60,14 @@ public class TycoonSimulation implements Simulation {
 
     public EconomyManager getEconomyManager() {
         return economyManager;
+    }
+
+    public void setPaused(boolean paused) {
+        this.paused = paused;
+        System.out.println("Simulation " + (paused ? "paused" : "unpaused"));
+    }
+
+    public boolean isPaused() {
+        return paused;
     }
 }
