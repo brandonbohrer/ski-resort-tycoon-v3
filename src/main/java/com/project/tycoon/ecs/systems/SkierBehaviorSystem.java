@@ -157,7 +157,7 @@ public class SkierBehaviorSystem implements System {
                 }
                 if (z >= SkierSpawnerSystem.BASE_Z - 2) {
                     trailDistance[x][z] = 0;
-                    queue.add(new int[]{x, z});
+                    queue.add(new int[] { x, z });
                     seeded = true;
                 }
             }
@@ -172,14 +172,14 @@ public class SkierBehaviorSystem implements System {
                     }
                     if (z == maxTrailZ) {
                         trailDistance[x][z] = 0;
-                        queue.add(new int[]{x, z});
+                        queue.add(new int[] { x, z });
                     }
                 }
             }
         }
 
-        int[] dxs = {-1, 0, 1, -1, 1, -1, 0, 1};
-        int[] dzs = {-1, -1, -1, 0, 0, 1, 1, 1};
+        int[] dxs = { -1, 0, 1, -1, 1, -1, 0, 1 };
+        int[] dzs = { -1, -1, -1, 0, 0, 1, 1, 1 };
 
         while (!queue.isEmpty()) {
             int[] cur = queue.removeFirst();
@@ -200,8 +200,9 @@ public class SkierBehaviorSystem implements System {
                 if (neighbor == null || !neighbor.isTrail()) {
                     continue;
                 }
+
                 trailDistance[nx][nz] = dist + 1;
-                queue.add(new int[]{nx, nz});
+                queue.add(new int[] { nx, nz });
             }
         }
 
@@ -234,6 +235,10 @@ public class SkierBehaviorSystem implements System {
         }
 
         trailFlowReady = true;
+        // Note: We don't call map.clean() here because TerrainRenderer needs to see the
+        // dirty flag
+        // to rebuild trail visuals. Trail flow will rebuild when map is dirty, which is
+        // fine.
     }
 
     private TrailStep getFlowStep(int x, int z, int currentHeight) {
@@ -354,33 +359,28 @@ public class SkierBehaviorSystem implements System {
         // Compare height with neighbors to find "Downhill" direction
         Tile current = map.getTile(x, z);
 
-        // Sample neighbors
-        // We look at X+1 and Z+1 to get a rough gradient vector
+        // Sample neighbors in ALL directions for accurate gradient (central difference)
+        Tile left = map.getTile(x - 1, z);
         Tile right = map.getTile(x + 1, z);
+        Tile up = map.getTile(x, z - 1);
         Tile down = map.getTile(x, z + 1);
 
         float h = current.getHeight();
+        float hLeft = (left != null) ? left.getHeight() : h;
         float hRight = (right != null) ? right.getHeight() : h;
+        float hUp = (up != null) ? up.getHeight() : h;
         float hDown = (down != null) ? down.getHeight() : h;
 
-        // Gradient: Negative means downhill
-        float dx = hRight - h;
-        float dz = hDown - h;
+        // Central difference gradient (more accurate and bidirectional)
+        // Positive gradient = uphill in that direction
+        float gradientX = (hRight - hLeft) / 2.0f;
+        float gradientZ = (hDown - hUp) / 2.0f;
 
-        // Apply forces downhill
-        // If dx is negative (right is lower), we accelerate positive X
-        // Force is proportional to steepness
-
+        // Apply forces downhill (opposite of gradient direction)
+        // Negative gradient = downhill = accelerate in that direction
         float delta = (float) dt;
-        if (dx < 0)
-            vel.dx += (-dx * GRAVITY * delta); // Accelerate Right
-        else if (dx > 0)
-            vel.dx -= (dx * GRAVITY * delta); // Accelerate Left (slide back)
-
-        if (dz < 0)
-            vel.dz += (-dz * GRAVITY * delta); // Accelerate Down
-        else if (dz > 0)
-            vel.dz -= (dz * GRAVITY * delta); // Accelerate Up
+        vel.dx -= gradientX * GRAVITY * delta;
+        vel.dz -= gradientZ * GRAVITY * delta;
 
         // Snap Y to terrain height (simple collision)
         pos.y = h;
@@ -428,7 +428,7 @@ public class SkierBehaviorSystem implements System {
     }
 
     private void steerTowardTile(TransformComponent pos, VelocityComponent vel, int tileX, int tileZ,
-                                 SkierComponent skier, int heightDrop) {
+            SkierComponent skier, int heightDrop) {
         float targetX = tileX + 0.5f;
         float targetZ = tileZ + 0.5f;
 
@@ -451,7 +451,7 @@ public class SkierBehaviorSystem implements System {
     }
 
     private void steerTowardTileAtSpeed(TransformComponent pos, VelocityComponent vel, int tileX, int tileZ,
-                                        float speed) {
+            float speed) {
         float targetX = tileX + 0.5f;
         float targetZ = tileZ + 0.5f;
 

@@ -31,7 +31,7 @@ public class TycoonSimulation implements Simulation {
         // Register Systems
         ecsEngine.addSystem(new SkierBehaviorSystem(ecsEngine, worldMap));
         ecsEngine.addSystem(new LiftSystem(ecsEngine, economyManager));
-        ecsEngine.addSystem(new PhysicsSystem(ecsEngine));
+        ecsEngine.addSystem(new PhysicsSystem(ecsEngine, worldMap));
         ecsEngine.addSystem(new SkierSpawnerSystem(ecsEngine, worldMap)); // Dynamic spawning
     }
 
