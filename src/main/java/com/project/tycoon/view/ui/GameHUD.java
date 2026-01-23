@@ -42,11 +42,19 @@ public class GameHUD {
     private final ButtonGroup<TextButton> constructionToolGroup = new ButtonGroup<>();
     private final ButtonGroup<TextButton> liftTypeGroup = new ButtonGroup<>();
 
-    // Finance labels
+    // Persistent money ticker (always visible)
+    private Table persistentMoneyTicker;
+    private Label tickerMoneyLabel;
+
+    // Detailed finance panel labels
     private Label moneyLabel;
+    private Label netLabel;
     private Label revenueLabel;
     private Label expenseLabel;
-    private Label netLabel;
+    private Label liftRevenueLabel;
+    private Label maintenanceExpenseLabel;
+    private Label skierCountLabel;
+    private Label liftCountLabel;
 
     public GameHUD(GameplayController controller, EconomyManager economy) {
         this.controller = controller;
@@ -82,6 +90,22 @@ public class GameHUD {
 
         stage.addActor(bottomBar);
 
+        // Persistent Money Ticker (Always Visible, Top-Right)
+        persistentMoneyTicker = new Table();
+        persistentMoneyTicker.setFillParent(true);
+        persistentMoneyTicker.top().right();
+        persistentMoneyTicker.pad(15);
+
+        tickerMoneyLabel = new Label("", skin, "title");
+        Table tickerBackground = new Table();
+        tickerBackground.setBackground(new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                skin.get("dark_gray", com.badlogic.gdx.graphics.Texture.class)));
+        tickerBackground.pad(10, 20, 10, 20);
+        tickerBackground.add(tickerMoneyLabel);
+
+        persistentMoneyTicker.add(tickerBackground);
+        stage.addActor(persistentMoneyTicker);
+
         // 1. Construction Toolbar (Main Level)
         Table constructionToolbar = new Table();
         constructionToolbar.setFillParent(true);
@@ -114,22 +138,66 @@ public class GameHUD {
 
         stage.addActor(liftTypesToolbar);
 
-        // 3. Finances Toolbar
+        // 3. Detailed Finances Panel
         Table financesToolbar = new Table();
         financesToolbar.setFillParent(true);
         financesToolbar.top().left().pad(20);
         financesToolbar.setVisible(false);
 
-        moneyLabel = new Label("", skin);
-        revenueLabel = new Label("", skin);
-        expenseLabel = new Label("", skin);
+        // Panel background
+        Table financesPanel = new Table();
+        financesPanel.setBackground(new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
+                skin.get("dark_gray", com.badlogic.gdx.graphics.Texture.class)));
+        financesPanel.pad(20);
+
+        // Header Section
+        Label financesTitle = new Label("=== FINANCES ===", skin, "title");
+        financesPanel.add(financesTitle).colspan(2).center().padBottom(15).row();
+
+        moneyLabel = new Label("", skin, "title");
+        financesPanel.add(moneyLabel).colspan(2).center().padBottom(10).row();
+
+        // Net Income Section (Color-coded)
         netLabel = new Label("", skin);
+        financesPanel.add(netLabel).colspan(2).center().padBottom(20).row();
 
-        financesToolbar.add(moneyLabel).left().row();
-        financesToolbar.add(revenueLabel).left().row();
-        financesToolbar.add(expenseLabel).left().row();
-        financesToolbar.add(netLabel).left().row();
+        // Revenue Section
+        Label revenueSectionLabel = new Label("--- REVENUE ---", skin);
+        financesPanel.add(revenueSectionLabel).colspan(2).left().padTop(10).row();
 
+        revenueLabel = new Label("", skin);
+        financesPanel.add(new Label("  Total:", skin)).left().padLeft(10);
+        financesPanel.add(revenueLabel).left().padLeft(10).row();
+
+        liftRevenueLabel = new Label("", skin);
+        financesPanel.add(new Label("  Lift Tickets:", skin)).left().padLeft(10);
+        financesPanel.add(liftRevenueLabel).left().padLeft(10).row();
+
+        // Expense Section
+        Label expenseSectionLabel = new Label("--- EXPENSES ---", skin);
+        financesPanel.add(expenseSectionLabel).colspan(2).left().padTop(20).row();
+
+        expenseLabel = new Label("", skin);
+        financesPanel.add(new Label("  Total:", skin)).left().padLeft(10);
+        financesPanel.add(expenseLabel).left().padLeft(10).row();
+
+        maintenanceExpenseLabel = new Label("", skin);
+        financesPanel.add(new Label("  Lift Maintenance:", skin)).left().padLeft(10);
+        financesPanel.add(maintenanceExpenseLabel).left().padLeft(10).row();
+
+        // Statistics Section
+        Label statsSectionLabel = new Label("--- STATISTICS ---", skin);
+        financesPanel.add(statsSectionLabel).colspan(2).left().padTop(20).row();
+
+        skierCountLabel = new Label("", skin);
+        financesPanel.add(new Label("  Active Skiers:", skin)).left().padLeft(10);
+        financesPanel.add(skierCountLabel).left().padLeft(10).row();
+
+        liftCountLabel = new Label("", skin);
+        financesPanel.add(new Label("  Active Lifts:", skin)).left().padLeft(10);
+        financesPanel.add(liftCountLabel).left().padLeft(10).row();
+
+        financesToolbar.add(financesPanel);
         stage.addActor(financesToolbar);
         toolbars.put("Finances", financesToolbar);
 
@@ -241,13 +309,57 @@ public class GameHUD {
     // handles it.
 
     public void render(float dt) {
-        // Update finance labels
+        // Update persistent money ticker (always visible)
+        if (tickerMoneyLabel != null) {
+            float money = economy.getCurrentMoney();
+            tickerMoneyLabel.setText(String.format("$%.0f", money));
+
+            // Color-code based on money status
+            if (money < 1000) {
+                tickerMoneyLabel.setColor(com.badlogic.gdx.graphics.Color.RED);
+            } else if (economy.getNetIncomePerSecond() > 0) {
+                tickerMoneyLabel.setColor(com.badlogic.gdx.graphics.Color.GREEN);
+            } else if (economy.getNetIncomePerSecond() < 0) {
+                tickerMoneyLabel.setColor(com.badlogic.gdx.graphics.Color.ORANGE);
+            } else {
+                tickerMoneyLabel.setColor(com.badlogic.gdx.graphics.Color.WHITE);
+            }
+        }
+
+        // Update detailed finance panel
         if (moneyLabel != null) {
-            moneyLabel.setText(String.format("Money: $%.0f", economy.getCurrentMoney()));
-            revenueLabel.setText(String.format("Revenue: $%.1f/sec", economy.getRevenuePerSecond()));
-            expenseLabel.setText(String.format("Expenses: $%.1f/sec", economy.getExpensesPerSecond()));
+            float money = economy.getCurrentMoney();
+            moneyLabel.setText(String.format("Current Balance: $%.0f", money));
+
+            // Net income with color coding
             float net = economy.getNetIncomePerSecond();
-            netLabel.setText(String.format("Net: $%.1f/sec", net));
+            netLabel.setText(String.format("Net Income: $%.2f/sec", net));
+            if (net > 0) {
+                netLabel.setColor(com.badlogic.gdx.graphics.Color.GREEN);
+            } else if (net < 0) {
+                netLabel.setColor(com.badlogic.gdx.graphics.Color.RED);
+            } else {
+                netLabel.setColor(com.badlogic.gdx.graphics.Color.WHITE);
+            }
+
+            // Revenue breakdown
+            float revenue = economy.getRevenuePerSecond();
+            revenueLabel.setText(String.format("$%.2f/sec", revenue));
+            revenueLabel.setColor(com.badlogic.gdx.graphics.Color.GREEN);
+            liftRevenueLabel.setText(String.format("$%.2f/sec", revenue)); // For now, all revenue is from lifts
+            liftRevenueLabel.setColor(com.badlogic.gdx.graphics.Color.GREEN);
+
+            // Expense breakdown
+            float expenses = economy.getExpensesPerSecond();
+            expenseLabel.setText(String.format("$%.2f/sec", expenses));
+            expenseLabel.setColor(com.badlogic.gdx.graphics.Color.RED);
+            maintenanceExpenseLabel.setText(String.format("$%.2f/sec", expenses)); // For now, all expenses are
+                                                                                   // maintenance
+            maintenanceExpenseLabel.setColor(com.badlogic.gdx.graphics.Color.RED);
+
+            // Statistics (placeholder for now)
+            skierCountLabel.setText("N/A");
+            liftCountLabel.setText("N/A");
         }
 
         stage.act(dt);

@@ -32,6 +32,12 @@ public class UIStyleGenerator {
         labelStyle.fontColor = Color.WHITE;
         skin.add("default", labelStyle);
 
+        // Title Label Style (for headers and important displays)
+        Label.LabelStyle titleStyle = new Label.LabelStyle();
+        titleStyle.font = font;
+        titleStyle.fontColor = Color.WHITE;
+        skin.add("title", titleStyle);
+
         // 4. Button Style (Flat, modern)
         TextButton.TextButtonStyle textButtonStyle = new TextButton.TextButtonStyle();
         textButtonStyle.font = font;
@@ -40,7 +46,7 @@ public class UIStyleGenerator {
         textButtonStyle.over = getDrawable(skin, "light_gray");
         textButtonStyle.fontColor = Color.WHITE;
         skin.add("default", textButtonStyle);
-        
+
         // 5. Toggle Button Style
         TextButton.TextButtonStyle toggleStyle = new TextButton.TextButtonStyle();
         toggleStyle.font = font;
