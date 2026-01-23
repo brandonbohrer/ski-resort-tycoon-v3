@@ -7,7 +7,8 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.project.tycoon.simulation.TycoonSimulation;
 import com.project.tycoon.view.renderer.CombinedRenderer;
-import com.project.tycoon.view.ui.GameHUD; // Import
+import com.project.tycoon.view.ui.GameHUD;
+import com.project.tycoon.view.ui.FinancesScreen;
 
 /**
  * The visual entry point of the game (LibGDX adapter).
@@ -18,7 +19,8 @@ public class TycoonGame extends Game {
 
     private final TycoonSimulation simulation;
     private CombinedRenderer combinedRenderer;
-    private GameHUD gameHUD; // Add HUD
+    private GameHUD gameHUD;
+    private FinancesScreen financesScreen;
     private OrthographicCamera camera;
     private CameraController cameraController;
     private GameplayController gameplayController;
@@ -55,10 +57,16 @@ public class TycoonGame extends Game {
         // Initialize HUD
         gameHUD = new GameHUD(gameplayController, simulation.getEconomyManager());
 
+        // Initialize Finances Screen
+        financesScreen = new FinancesScreen(gameHUD.getSkin(), simulation.getEconomyManager(),
+                simulation.getEcsEngine());
+        gameHUD.setFinancesScreen(financesScreen);
+
         // Multiplexer to handle both camera and gameplay inputs
         com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();
-        multiplexer.addProcessor(gameHUD.getStage()); // UI First!
-        multiplexer.addProcessor(gameplayController); // Gameplay second
+        multiplexer.addProcessor(financesScreen.getStage()); // Finances screen first (when visible)
+        multiplexer.addProcessor(gameHUD.getStage()); // UI second!
+        multiplexer.addProcessor(gameplayController); // Gameplay third
         multiplexer.addProcessor(cameraController); // Camera last
         Gdx.input.setInputProcessor(multiplexer);
 
@@ -97,6 +105,9 @@ public class TycoonGame extends Game {
 
         // 3. Render UI (On top)
         gameHUD.render((float) deltaTime);
+
+        // 4. Render Finances Screen (if visible, covers everything)
+        financesScreen.render((float) deltaTime);
     }
 
     @Override
@@ -105,6 +116,7 @@ public class TycoonGame extends Game {
         camera.viewportHeight = height;
         camera.update();
         gameHUD.resize(width, height);
+        financesScreen.resize(width, height);
     }
 
     @Override
@@ -114,6 +126,9 @@ public class TycoonGame extends Game {
         }
         if (gameHUD != null) {
             gameHUD.dispose();
+        }
+        if (financesScreen != null) {
+            financesScreen.dispose();
         }
     }
 }

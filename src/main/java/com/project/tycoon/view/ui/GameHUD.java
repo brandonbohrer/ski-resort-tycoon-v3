@@ -56,6 +56,8 @@ public class GameHUD {
     private Label skierCountLabel;
     private Label liftCountLabel;
 
+    private FinancesScreen financesScreen;
+
     public GameHUD(GameplayController controller, EconomyManager economy) {
         this.controller = controller;
         this.economy = economy;
@@ -139,8 +141,9 @@ public class GameHUD {
             public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y, int pointer,
                     int button) {
                 if (button == com.badlogic.gdx.Input.Buttons.LEFT) {
-                    // TODO: Open finances screen
-                    System.out.println("Ticker clicked! Opening finances screen...");
+                    if (financesScreen != null) {
+                        financesScreen.show();
+                    }
                     return true;
                 }
                 return false;
@@ -277,6 +280,14 @@ public class GameHUD {
     }
 
     private void showCategory(String name) {
+        // Special handling for Finances - open fullscreen overlay
+        if ("Finances".equals(name)) {
+            if (financesScreen != null) {
+                financesScreen.show();
+            }
+            return;
+        }
+
         // Hide all toolbars first (safety)
         for (Table t : toolbars.values())
             t.setVisible(false);
@@ -411,5 +422,13 @@ public class GameHUD {
 
     public Stage getStage() {
         return stage;
+    }
+
+    public Skin getSkin() {
+        return skin;
+    }
+
+    public void setFinancesScreen(FinancesScreen financesScreen) {
+        this.financesScreen = financesScreen;
     }
 }
