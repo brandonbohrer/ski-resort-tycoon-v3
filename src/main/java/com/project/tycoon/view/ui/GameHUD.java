@@ -28,6 +28,16 @@ public class GameHUD {
     private final ButtonGroup<TextButton> categoryGroup = new ButtonGroup<>();
     private final Map<String, Table> toolbars = new HashMap<>();
 
+    // Menu navigation state
+    private MenuLevel currentMenuLevel = MenuLevel.MAIN_CATEGORIES;
+    private Table liftTypesToolbar;
+
+    private enum MenuLevel {
+        MAIN_CATEGORIES, // Construction / Finances / etc
+        CONSTRUCTION_TOOLS, // Terrain / Lifts / Trails
+        LIFT_TYPES // T-Bar / Chairlift / Gondola
+    }
+
     // Tool State
     private final ButtonGroup<TextButton> constructionToolGroup = new ButtonGroup<>();
     private final ButtonGroup<TextButton> liftTypeGroup = new ButtonGroup<>();
@@ -52,10 +62,10 @@ public class GameHUD {
         categoryGroup.setMinCheckCount(0); // Allow deselecting all
         categoryGroup.setMaxCheckCount(1);
 
-        constructionToolGroup.setMinCheckCount(1); // Always one active tool
+        constructionToolGroup.setMinCheckCount(0); // Allow none selected initially
         constructionToolGroup.setMaxCheckCount(1);
 
-        liftTypeGroup.setMinCheckCount(1); // Always one lift type selected
+        liftTypeGroup.setMinCheckCount(0); // Allow none selected initially
         liftTypeGroup.setMaxCheckCount(1);
 
         // Main Bottom Bar
@@ -72,7 +82,7 @@ public class GameHUD {
 
         stage.addActor(bottomBar);
 
-        // 1. Construction Toolbar
+        // 1. Construction Toolbar (Main Level)
         Table constructionToolbar = new Table();
         constructionToolbar.setFillParent(true);
         constructionToolbar.bottom().padBottom(80);
@@ -80,25 +90,31 @@ public class GameHUD {
 
         constructionToolbar.add(createToolButton("Terrain", () -> controller.setMode(InteractionMode.TERRAIN)))
                 .height(50).width(120).pad(5);
-        constructionToolbar.add(createToolButton("Lifts", () -> controller.setMode(InteractionMode.BUILD))).height(50)
+        constructionToolbar.add(createToolButton("Lifts", () -> showLiftTypesMenu())).height(50)
                 .width(120).pad(5);
         constructionToolbar.add(createToolButton("Trails", () -> controller.setMode(InteractionMode.TRAIL))).height(50)
                 .width(120).pad(5);
 
-        // Lift type selector
-        constructionToolbar.row();
-        constructionToolbar.add(new Label("Lift Type:", skin)).padTop(10).left();
-        constructionToolbar.add(createLiftTypeButton("T-Bar", LiftComponent.LiftType.TBAR)).height(40).width(120)
-                .pad(5);
-        constructionToolbar.add(createLiftTypeButton("Chairlift", LiftComponent.LiftType.CHAIRLIFT)).height(40)
-                .width(120).pad(5);
-        constructionToolbar.add(createLiftTypeButton("Gondola", LiftComponent.LiftType.GONDOLA)).height(40).width(120)
-                .pad(5);
-
         stage.addActor(constructionToolbar);
         toolbars.put("Construction", constructionToolbar);
 
-        // 2. Finances Toolbar
+        // 2. Lift Types Toolbar (Sub-menu)
+        liftTypesToolbar = new Table();
+        liftTypesToolbar.setFillParent(true);
+        liftTypesToolbar.bottom().padBottom(80);
+        liftTypesToolbar.setVisible(false);
+
+        liftTypesToolbar.add(createBackButton()).height(50).width(100).pad(5);
+        liftTypesToolbar.add(createLiftTypeButton("T-Bar", LiftComponent.LiftType.TBAR)).height(50).width(120)
+                .pad(5);
+        liftTypesToolbar.add(createLiftTypeButton("Chairlift", LiftComponent.LiftType.CHAIRLIFT)).height(50)
+                .width(120).pad(5);
+        liftTypesToolbar.add(createLiftTypeButton("Gondola", LiftComponent.LiftType.GONDOLA)).height(50).width(120)
+                .pad(5);
+
+        stage.addActor(liftTypesToolbar);
+
+        // 3. Finances Toolbar
         Table financesToolbar = new Table();
         financesToolbar.setFillParent(true);
         financesToolbar.top().left().pad(20);
@@ -116,6 +132,20 @@ public class GameHUD {
 
         stage.addActor(financesToolbar);
         toolbars.put("Finances", financesToolbar);
+
+        // Add right-click listener for back navigation
+        stage.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override
+            public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent event,
+                    float x, float y, int pointer, int button) {
+                // Only consume right-click if we're in a sub-menu
+                if (button == com.badlogic.gdx.Input.Buttons.RIGHT && currentMenuLevel == MenuLevel.LIFT_TYPES) {
+                    goBack();
+                    return true; // Consume event
+                }
+                return false; // Don't consume - let camera controller handle it
+            }
+        });
     }
 
     private TextButton createCategoryButton(String name) {
@@ -172,16 +202,38 @@ public class GameHUD {
             public void changed(ChangeEvent event, Actor actor) {
                 if (btn.isChecked()) {
                     controller.setSelectedLiftType(type);
+                    controller.setMode(InteractionMode.BUILD); // Activate build mode when lift type selected
                 }
             }
         });
         liftTypeGroup.add(btn);
+        return btn;
+    }
 
-        // Select T-bar by default
-        if (type == LiftComponent.LiftType.TBAR) {
-            btn.setChecked(true);
+    private void showLiftTypesMenu() {
+        currentMenuLevel = MenuLevel.LIFT_TYPES;
+        toolbars.get("Construction").setVisible(false);
+        liftTypesToolbar.setVisible(true);
+        System.out.println("Showing lift types menu");
+    }
+
+    private void goBack() {
+        if (currentMenuLevel == MenuLevel.LIFT_TYPES) {
+            currentMenuLevel = MenuLevel.CONSTRUCTION_TOOLS;
+            liftTypesToolbar.setVisible(false);
+            toolbars.get("Construction").setVisible(true);
+            System.out.println("Back to construction tools");
         }
+    }
 
+    private TextButton createBackButton() {
+        TextButton btn = new TextButton("← Back", skin);
+        btn.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                goBack();
+            }
+        });
         return btn;
     }
 
