@@ -1,12 +1,17 @@
 package com.project.tycoon.simulation;
 
 import com.project.tycoon.ecs.Engine;
+import com.project.tycoon.ecs.Entity;
+import com.project.tycoon.ecs.components.BaseCampComponent;
+import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.ecs.systems.core.PhysicsSystem;
 import com.project.tycoon.ecs.systems.lift.LiftSystem;
 import com.project.tycoon.ecs.systems.skier.SkierBehaviorSystem;
 import com.project.tycoon.ecs.systems.skier.SkierPhysicsSystem;
 import com.project.tycoon.ecs.systems.skier.SkierSpawnerSystem;
 import com.project.tycoon.economy.EconomyManager;
+import com.project.tycoon.world.SnapPointManager;
+import com.project.tycoon.world.model.SnapPoint;
 import com.project.tycoon.world.model.TerrainGenerator;
 import com.project.tycoon.world.model.WorldMap;
 
@@ -21,6 +26,7 @@ public class TycoonSimulation implements Simulation {
     private final EconomyManager economyManager;
     private final DayTimeSystem dayTimeSystem;
     private final VisitorManager visitorManager;
+    private final SnapPointManager snapPointManager;
 
     private boolean paused = false;
     private float timeScale = 1.0f; // 1x, 2x, or 3x speed
@@ -34,9 +40,13 @@ public class TycoonSimulation implements Simulation {
         // Generate Mountain Terrain
         TerrainGenerator.generateMountain(this.worldMap);
 
-        // Initialize day/time system
+        // Initialize managers
         this.dayTimeSystem = new DayTimeSystem();
         this.visitorManager = new VisitorManager();
+        this.snapPointManager = new SnapPointManager();
+
+        // Create base camp
+        createBaseCamp();
 
         // Setup day transition listeners
         dayTimeSystem.setDayTransitionListener(new DayTimeSystem.DayTransitionListener() {
@@ -117,5 +127,33 @@ public class TycoonSimulation implements Simulation {
 
     public VisitorManager getVisitorManager() {
         return visitorManager;
+    }
+
+    public SnapPointManager getSnapPointManager() {
+        return snapPointManager;
+    }
+
+    /**
+     * Create the base camp building at the bottom of the mountain.
+     */
+    private void createBaseCamp() {
+        // Base camp location (center bottom of map)
+        int baseCampX = worldMap.getWidth() / 2;
+        int baseCampZ = worldMap.getDepth() - 6; // Near bottom
+        float baseCampHeight = worldMap.getTile(baseCampX, baseCampZ).getHeight();
+
+        // Create base camp entity
+        Entity baseCamp = ecsEngine.createEntity();
+        ecsEngine.addComponent(baseCamp, new BaseCampComponent());
+        ecsEngine.addComponent(baseCamp, new TransformComponent(baseCampX, baseCampHeight, baseCampZ));
+
+        // Register base camp snap point
+        SnapPoint baseCampSnapPoint = new SnapPoint(
+                baseCampX, baseCampZ,
+                SnapPoint.SnapPointType.BASE_CAMP,
+                baseCamp.getId());
+        snapPointManager.registerSnapPoint(baseCampSnapPoint);
+
+        System.out.println("Base camp created at (" + baseCampX + ", " + baseCampZ + ")");
     }
 }
