@@ -6,6 +6,7 @@ import com.project.tycoon.ecs.System;
 import com.project.tycoon.ecs.components.SkierComponent;
 import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.ecs.components.VelocityComponent;
+import com.project.tycoon.simulation.VisitorManager;
 import com.project.tycoon.world.model.Tile;
 import com.project.tycoon.world.model.WorldMap;
 
@@ -20,6 +21,7 @@ public class SkierSpawnerSystem implements System {
 
     private final Engine engine;
     private final WorldMap worldMap;
+    private VisitorManager visitorManager; // Injected after construction
 
     // Spawning configuration
     private static final int TARGET_POPULATION = 75;
@@ -34,6 +36,13 @@ public class SkierSpawnerSystem implements System {
         this.engine = engine;
         this.worldMap = worldMap;
     }
+    
+    /**
+     * Set the visitor manager (called by TycoonSimulation after construction).
+     */
+    public void setVisitorManager(VisitorManager visitorManager) {
+        this.visitorManager = visitorManager;
+    }
 
     @Override
     public void update(double dt) {
@@ -43,11 +52,15 @@ public class SkierSpawnerSystem implements System {
         // Despawn finished skiers
         despawnFinishedSkiers();
 
-        // Spawn new skiers if below target
+        // Spawn new skiers if below target AND within visitor cap
         timeSinceLastSpawn += dt;
         if (skierCount < TARGET_POPULATION && timeSinceLastSpawn >= SPAWN_INTERVAL) {
-            spawnSkier();
-            timeSinceLastSpawn = 0.0f;
+            // Check if we can spawn more visitors today
+            if (visitorManager != null && visitorManager.canSpawnVisitor()) {
+                spawnSkier();
+                visitorManager.recordVisitorSpawned();
+                timeSinceLastSpawn = 0.0f;
+            }
         }
     }
 

@@ -19,6 +19,9 @@ public class TycoonSimulation implements Simulation {
     private final Engine ecsEngine;
     private final WorldMap worldMap;
     private final EconomyManager economyManager;
+    private final DayTimeSystem dayTimeSystem;
+    private final VisitorManager visitorManager;
+
     private boolean paused = false;
     private float timeScale = 1.0f; // 1x, 2x, or 3x speed
 
@@ -31,12 +34,32 @@ public class TycoonSimulation implements Simulation {
         // Generate Mountain Terrain
         TerrainGenerator.generateMountain(this.worldMap);
 
+        // Initialize day/time system
+        this.dayTimeSystem = new DayTimeSystem();
+        this.visitorManager = new VisitorManager();
+
+        // Setup day transition listeners
+        dayTimeSystem.setDayTransitionListener(new DayTimeSystem.DayTransitionListener() {
+            @Override
+            public void onDayEnd(int dayNumber) {
+                visitorManager.endOfDay();
+            }
+
+            @Override
+            public void onDayStart(int dayNumber) {
+                visitorManager.startNewDay();
+            }
+        });
+
         // Register Systems
         ecsEngine.addSystem(new PhysicsSystem(ecsEngine, worldMap)); // General physics
         ecsEngine.addSystem(new SkierPhysicsSystem(ecsEngine, worldMap)); // Skiing slope physics
         ecsEngine.addSystem(new SkierBehaviorSystem(ecsEngine, worldMap)); // Skier AI/behavior
         ecsEngine.addSystem(new LiftSystem(ecsEngine, economyManager)); // Lift operations
-        ecsEngine.addSystem(new SkierSpawnerSystem(ecsEngine, worldMap)); // Dynamic spawning
+
+        SkierSpawnerSystem spawnerSystem = new SkierSpawnerSystem(ecsEngine, worldMap);
+        spawnerSystem.setVisitorManager(visitorManager); // Inject visitor manager
+        ecsEngine.addSystem(spawnerSystem);
     }
 
     @Override
@@ -49,6 +72,10 @@ public class TycoonSimulation implements Simulation {
         // Fixed time step with speed scaling
         double fixedDt = 1.0 / 60.0;
         double scaledDt = fixedDt * timeScale;
+
+        // Update day/time system
+        dayTimeSystem.update(scaledDt);
+
         ecsEngine.update(scaledDt);
         economyManager.update(scaledDt);
     }
@@ -73,8 +100,17 @@ public class TycoonSimulation implements Simulation {
     public boolean isPaused() {
         return paused;
     }
+
     public void setTimeScale(float scale) {
         this.timeScale = scale;
         System.out.println("Speed set to " + scale + "x");
+    }
+
+    public DayTimeSystem getDayTimeSystem() {
+        return dayTimeSystem;
+    }
+
+    public VisitorManager getVisitorManager() {
+        return visitorManager;
     }
 }

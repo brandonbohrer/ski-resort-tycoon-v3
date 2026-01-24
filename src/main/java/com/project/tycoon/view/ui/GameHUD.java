@@ -22,6 +22,7 @@ public class GameHUD {
     private CategoryBar categoryBar;
     private ConstructionMenu constructionMenu;
     private SpeedControls speedControls;
+    private TimeDisplay timeDisplay;
     private FinancesScreen financesScreen;
 
     private final TycoonSimulation simulation;
@@ -59,6 +60,8 @@ public class GameHUD {
                 simulation.setTimeScale(timeScale);
             }
         });
+
+        timeDisplay = new TimeDisplay(skin, stage, simulation.getDayTimeSystem());
     }
 
     private void handleCategorySelected(String categoryName) {
@@ -97,6 +100,7 @@ public class GameHUD {
 
     public void render(float dt) {
         moneyTicker.update(dt);
+        timeDisplay.update(dt);
         stage.act(dt);
         stage.draw();
     }
