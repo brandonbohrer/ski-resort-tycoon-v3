@@ -73,8 +73,4 @@ public class TycoonSimulation implements Simulation {
     public boolean isPaused() {
         return paused;
     }
-    public void setTimeScale(float scale) {
-        this.timeScale = scale;
-        System.out.println("Speed set to " + scale + "x");
-    }
 }

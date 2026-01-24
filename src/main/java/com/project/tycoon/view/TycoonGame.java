@@ -55,7 +55,7 @@ public class TycoonGame extends Game {
         gameplayController = new GameplayController(simulation, camera);
 
         // Initialize HUD
-        gameHUD = new GameHUD(gameplayController, simulation.getEconomyManager());
+        gameHUD = new GameHUD(gameplayController, simulation.getEconomyManager(), simulation);
 
         // Initialize Finances Screen
         financesScreen = new FinancesScreen(gameHUD.getSkin(), simulation.getEconomyManager(),
@@ -66,6 +66,7 @@ public class TycoonGame extends Game {
         com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();
         multiplexer.addProcessor(financesScreen.getStage()); // Finances screen first (when visible)
         multiplexer.addProcessor(gameHUD.getStage()); // UI second!
+        multiplexer.addProcessor(gameHUD.getKeyboardProcessor()); // Keyboard shortcuts
         multiplexer.addProcessor(gameplayController); // Gameplay third
         multiplexer.addProcessor(cameraController); // Camera last
         Gdx.input.setInputProcessor(multiplexer);
