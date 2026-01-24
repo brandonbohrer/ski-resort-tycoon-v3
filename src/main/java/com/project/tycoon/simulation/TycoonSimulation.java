@@ -42,6 +42,11 @@ public class TycoonSimulation implements Simulation {
         dayTimeSystem.setDayTransitionListener(new DayTimeSystem.DayTransitionListener() {
             @Override
             public void onDayEnd(int dayNumber) {
+                // Apply end-of-day revenue
+                float revenue = economyManager.endOfDay();
+                System.out.println("Day " + dayNumber + " ended. Revenue: $" + String.format("%.2f", revenue));
+
+                // Update visitor stats
                 visitorManager.endOfDay();
             }
 

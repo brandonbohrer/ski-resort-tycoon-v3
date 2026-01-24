@@ -158,7 +158,7 @@ public class LiftSystem implements System {
                         skier.targetLiftId = liftId;
 
                         // Charge ticket revenue
-                        economy.addRevenue(EconomyManager.TICKET_PRICE);
+                        economy.recordTicketSale();
                     }
                 }
 

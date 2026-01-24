@@ -11,12 +11,9 @@ public class EconomyManager {
     private float totalRevenue;
     private float totalExpenses;
 
-    // Per-second tracking for display
-    private float revenueThisCycle;
-    private float expensesThisCycle;
-    private float cycleTimer;
-    private float revenuePerSecond;
-    private float expensesPerSecond;
+    // Daily revenue tracking (batch system)
+    private float pendingDailyRevenue; // Accumulates during day
+    private float lastDailyRevenue; // Yesterday's revenue for display
 
     // Configuration constants
     public static final float STARTING_MONEY = 15000f;
@@ -26,20 +23,16 @@ public class EconomyManager {
         this.currentMoney = STARTING_MONEY;
         this.totalRevenue = 0f;
         this.totalExpenses = 0f;
-        this.revenueThisCycle = 0f;
-        this.expensesThisCycle = 0f;
-        this.cycleTimer = 0f;
-        this.revenuePerSecond = 0f;
-        this.expensesPerSecond = 0f;
+        this.pendingDailyRevenue = 0f;
+        this.lastDailyRevenue = 0f;
     }
 
     /**
-     * Add revenue from ticket sales or other sources.
+     * Record a ticket sale (does NOT apply revenue immediately).
+     * Revenue is applied at end of day.
      */
-    public void addRevenue(float amount) {
-        currentMoney += amount;
-        totalRevenue += amount;
-        revenueThisCycle += amount;
+    public void recordTicketSale() {
+        pendingDailyRevenue += TICKET_PRICE;
     }
 
     /**
@@ -48,7 +41,6 @@ public class EconomyManager {
     public void deductExpense(float amount) {
         currentMoney -= amount;
         totalExpenses += amount;
-        expensesThisCycle += amount;
     }
 
     /**
@@ -71,21 +63,30 @@ public class EconomyManager {
     }
 
     /**
-     * Update per-second calculations for display.
+     * Called at end of each day to apply batch revenue.
+     * 
+     * @return The revenue earned this day
+     */
+    public float endOfDay() {
+        // Apply pending revenue
+        currentMoney += pendingDailyRevenue;
+        totalRevenue += pendingDailyRevenue;
+
+        // Store for display
+        lastDailyRevenue = pendingDailyRevenue;
+
+        // Reset for next day
+        float revenue = pendingDailyRevenue;
+        pendingDailyRevenue = 0f;
+
+        return revenue;
+    }
+
+    /**
+     * Update method (minimal now that we don't track per-second revenue).
      */
     public void update(double dt) {
-        cycleTimer += dt;
-
-        // Update rates every second
-        if (cycleTimer >= 1.0) {
-            revenuePerSecond = revenueThisCycle / (float) cycleTimer;
-            expensesPerSecond = expensesThisCycle / (float) cycleTimer;
-
-            // Reset cycle
-            revenueThisCycle = 0f;
-            expensesThisCycle = 0f;
-            cycleTimer = 0f;
-        }
+        // Placeholder for future per-second expenses if needed
     }
 
     // Getters
@@ -101,15 +102,11 @@ public class EconomyManager {
         return totalExpenses;
     }
 
-    public float getRevenuePerSecond() {
-        return revenuePerSecond;
+    public float getPendingDailyRevenue() {
+        return pendingDailyRevenue;
     }
 
-    public float getExpensesPerSecond() {
-        return expensesPerSecond;
-    }
-
-    public float getNetIncomePerSecond() {
-        return revenuePerSecond - expensesPerSecond;
+    public float getLastDailyRevenue() {
+        return lastDailyRevenue;
     }
 }

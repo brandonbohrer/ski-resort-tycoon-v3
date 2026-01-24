@@ -69,10 +69,10 @@ public class MoneyTicker {
         background.addListener(new InputListener() {
             @Override
             public void enter(InputEvent event, float x, float y, int pointer, Actor fromActor) {
-                float dailyProfit = economy.getNetIncomePerSecond() * 86400;
-                String profitText = String.format("%s$%.0f/day", dailyProfit >= 0 ? "+" : "", dailyProfit);
-                tooltipLabel.setText(profitText);
-                tooltipLabel.setColor(dailyProfit >= 0 ? Color.GREEN : Color.RED);
+                float lastRevenue = economy.getLastDailyRevenue();
+                String revenueText = String.format("Yesterday: $%.0f", lastRevenue);
+                tooltipLabel.setText(revenueText);
+                tooltipLabel.setColor(Color.WHITE);
                 tooltipWindow.pack();
                 tooltipWindow.setPosition(
                         event.getStageX() - tooltipWindow.getWidth() / 2,
