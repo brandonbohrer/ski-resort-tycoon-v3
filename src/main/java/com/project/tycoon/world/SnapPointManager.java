@@ -114,6 +114,35 @@ public class SnapPointManager {
     }
 
     /**
+     * Get all snap points within radius of position (sorted by distance).
+     * Used for trail building validation.
+     */
+    public List<SnapPoint> getSnapPointsNear(float x, float z, float radius) {
+        List<SnapPoint> result = new ArrayList<>();
+
+        for (SnapPoint sp : snapPoints.values()) {
+            float dx = sp.getX() - x;
+            float dz = sp.getZ() - z;
+            float dist = (float) Math.sqrt(dx * dx + dz * dz);
+
+            if (dist <= radius) {
+                result.add(sp);
+            }
+        }
+
+        // Sort by distance (closest first)
+        result.sort((a, b) -> {
+            float distA = (float) Math.sqrt(
+                    Math.pow(a.getX() - x, 2) + Math.pow(a.getZ() - z, 2));
+            float distB = (float) Math.sqrt(
+                    Math.pow(b.getX() - x, 2) + Math.pow(b.getZ() - z, 2));
+            return Float.compare(distA, distB);
+        });
+
+        return result;
+    }
+
+    /**
      * Simple pathfinding: find a path between two snap points.
      * Returns list of snap point IDs representing the path.
      * For now, just returns direct connection if exists.

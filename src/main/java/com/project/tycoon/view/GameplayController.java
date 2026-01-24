@@ -11,9 +11,13 @@ import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.economy.EconomyManager;
 import com.project.tycoon.simulation.TycoonSimulation;
 import com.project.tycoon.world.model.Tile;
+import com.project.tycoon.world.model.SnapPoint;
+import com.project.tycoon.world.SnapPointManager;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
 
 import com.project.tycoon.ecs.components.TrailComponent; // Add Import
+
+import java.util.*;
 
 /**
  * Handles gameplay input (Selection, Terrain modification).
@@ -45,9 +49,20 @@ public class GameplayController extends InputAdapter {
     private LiftPreview currentPreview = null;
     private LiftComponent.LiftType selectedLiftType = LiftComponent.LiftType.TBAR; // Default cheapest
 
-    // Trail Building State
-    private boolean isPaintingTrail = false;
-    private Entity currentTrailEntity = null;
+    // Trail Building State (Snap Point System)
+    private enum TrailBuildState {
+        WAITING_FOR_START, // Waiting to click on start snap point
+        PAINTING, // Actively painting trail tiles (auto-follows cursor)
+        CONFIRMATION_DIALOG // Showing confirm/cancel dialog
+    }
+
+    private TrailBuildState trailBuildState = TrailBuildState.WAITING_FOR_START;
+    private SnapPoint trailStartSnapPoint = null;
+    private SnapPoint proposedEndSnapPoint = null;
+    private List<Vector2> pendingTrailTiles = new ArrayList<>();
+    private SnapPoint nearbySnapPoint = null; // Currently hovered snap point
+    private Vector2 lastPaintedTile = null; // Prevent duplicate painting
+    private static final float SNAP_RADIUS = 3.0f; // tiles
 
     public GameplayController(TycoonSimulation simulation, OrthographicCamera camera) {
         this.simulation = simulation;
@@ -91,52 +106,33 @@ public class GameplayController extends InputAdapter {
         updateHoveredTile(screenX, screenY);
         updateLiftPreview();
 
-        if (currentMode == InteractionMode.TRAIL && isPaintingTrail) {
-            paintTrailTile();
+        // Auto-paint trail tiles when in PAINTING state
+        if (currentMode == InteractionMode.TRAIL && trailBuildState == TrailBuildState.PAINTING) {
+            autoPaintTrailTile();
         }
 
         return false;
     }
 
-    private void paintTrailTile() {
-        int radius = 2; // Brush Radius (Diameter ~5)
+    // Auto-paint trail tiles as cursor moves (snap point system)
+    private void autoPaintTrailTile() {
+        Vector2 currentTile = new Vector2(hoveredX, hoveredZ);
 
-        for (int z = hoveredZ - radius; z <= hoveredZ + radius; z++) {
-            for (int x = hoveredX - radius; x <= hoveredX + radius; x++) {
-                // Circular Brush
-                float dx = x - hoveredX;
-                float dz = z - hoveredZ;
-                if (dx * dx + dz * dz > (radius + 0.5f) * (radius + 0.5f))
-                    continue; // +0.5 for smoother circle
+        // Prevent duplicate painting
+        if (lastPaintedTile != null && lastPaintedTile.equals(currentTile)) {
+            return;
+        }
 
-                Tile tile = simulation.getWorldMap().getTile(x, z);
-                if (tile != null && !tile.isTrail()) {
-                    // Add to component
-                    if (currentTrailEntity != null) {
-                        TrailComponent trail = simulation.getEcsEngine().getComponent(currentTrailEntity,
-                                TrailComponent.class);
+        // Paint this tile
+        Tile tile = simulation.getWorldMap().getTile(hoveredX, hoveredZ);
+        if (tile != null) {
+            pendingTrailTiles.add(currentTile);
+            lastPaintedTile = currentTile;
 
-                        // Check if already added to this specific trail entity
-                        boolean exists = false;
-                        for (Vector2 v : trail.tiles) {
-                            if ((int) v.x == x && (int) v.y == z) {
-                                exists = true;
-                                break;
-                            }
-                        }
-
-                        if (!exists) {
-                            trail.addTile(x, z);
-
-                            // Modify World
-                            tile.setTrail(true);
-                            tile.setDecoration(com.project.tycoon.world.model.Decoration.NONE); // Clear trees/rocks
-                            simulation.getWorldMap().setTile(x, z, tile); // Updates dirty flag
-                            clearTrailCorridor(x, z);
-                        }
-                    }
-                }
-            }
+            // Visual preview: temporarily mark as trail
+            // (will be finalized only on confirmation)
+            tile.setTrail(true);
+            simulation.getWorldMap().setTile(hoveredX, hoveredZ, tile);
         }
     }
 
@@ -164,6 +160,91 @@ public class GameplayController extends InputAdapter {
         }
     }
 
+
+    // ==== SNAP POINT TRAIL BUILDING METHODS ====
+    
+    private SnapPoint findNearbySnapPoint(int tileX, int tileZ) {
+        List<SnapPoint> nearby = simulation.getSnapPointManager().getSnapPointsNear(tileX, tileZ, SNAP_RADIUS);
+        
+        // Return closest valid snap point
+        for (SnapPoint sp : nearby) {
+            if (isValidTrailSnapPoint(sp)) {
+                return sp;
+            }
+        }
+        return null;
+    }
+    
+    private boolean isValidTrailSnapPoint(SnapPoint sp) {
+        switch (sp.getType()) {
+            case BASE_CAMP:
+            case TRAIL_END:
+            case LIFT_BOTTOM:
+            case LIFT_TOP:
+                return true;
+            default:
+                return false;
+        }
+    }
+    
+    private void handleTrailClick() {
+        nearbySnapPoint = findNearbySnapPoint(hoveredX, hoveredZ);
+        
+        switch (trailBuildState) {
+            case WAITING_FOR_START:
+                // Must click on a valid snap point to start
+                if (nearbySnapPoint != null) {
+                    trailStartSnapPoint = nearbySnapPoint;
+                    trailBuildState = TrailBuildState.PAINTING;
+                    pendingTrailTiles.clear();
+                    
+                    // Paint initial tile
+                    pendingTrailTiles.add(new Vector2(hoveredX, hoveredZ));
+                    lastPaintedTile =  new Vector2(hoveredX, hoveredZ);
+                    
+                    System.out.println("Trail started from " + nearbySnapPoint.getType());
+                } else {
+                    System.out.println("Must click on snap point to start trail!");
+                }
+                break;
+                
+            case PAINTING:
+                // Propose ending at snap point
+                if (nearbySnapPoint != null) {
+                    proposedEndSnapPoint = nearbySnapPoint;
+                    trailBuildState = TrailBuildState.CONFIRMATION_DIALOG;
+                    System.out.println("Trail proposed to end at " + nearbySnapPoint.getType());
+                    // TODO: Show confirmation dialog
+                } else {
+                    System.out.println("Must click on snap point to end trail!");
+                }
+                break;
+                
+            case CONFIRMATION_DIALOG:
+                // Handled by dialog UI
+                break;
+        }
+    }
+    
+    private void resetTrailState() {
+        // Undo visual preview of pending trail tiles
+        for (Vector2 tile : pendingTrailTiles) {
+            Tile t = simulation.getWorldMap().getTile((int)tile.x, (int)tile.y);
+            if (t != null) {
+                t.setTrail(false);
+                simulation.getWorldMap().setTile((int)tile.x, (int)tile.y, t);
+            }
+        }
+        
+        trailBuildState = TrailBuildState.WAITING_FOR_START;
+        trailStartSnapPoint = null;
+        proposedEndSnapPoint = null;
+        pendingTrailTiles.clear();
+        nearbySnapPoint = null;
+        lastPaintedTile = null;
+    }
+
+
     @Override
     public boolean touchDown(int screenX, int screenY, int pointer, int button) {
         if (button == Input.Buttons.LEFT) {
@@ -172,14 +253,17 @@ public class GameplayController extends InputAdapter {
             Tile tile = simulation.getWorldMap().getTile(hoveredX, hoveredZ);
             if (tile != null) {
                 if (currentMode == InteractionMode.TRAIL) {
-                    // Start new trail
-                    isPaintingTrail = true;
-                    currentTrailEntity = simulation.getEcsEngine().createEntity();
-                    simulation.getEcsEngine().addComponent(currentTrailEntity, new TrailComponent());
-                    paintTrailTile(); // Paint initial tile
+                    handleTrailClick();
                 } else {
                     handleInteraction(tile);
                 }
+                return true;
+            }
+        } else if (button == Input.Buttons.RIGHT) {
+            // Right-click to cancel trail in PAINTING state
+            if (currentMode == InteractionMode.TRAIL && trailBuildState == TrailBuildState.PAINTING) {
+                System.out.println("Trail cancelled");
+                resetTrailState();
                 return true;
             }
         }
@@ -188,12 +272,7 @@ public class GameplayController extends InputAdapter {
 
     @Override
     public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-        if (currentMode == InteractionMode.TRAIL && isPaintingTrail) {
-            isPaintingTrail = false;
-            currentTrailEntity = null;
-            System.out.println("Trail Finished");
-            return true;
-        }
+        // Touch up handled inline with clicks in touchDown for snap point system
         return false;
     }
 
