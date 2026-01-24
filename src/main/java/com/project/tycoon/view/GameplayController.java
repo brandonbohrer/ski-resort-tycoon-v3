@@ -12,10 +12,7 @@ import com.project.tycoon.economy.EconomyManager;
 import com.project.tycoon.simulation.TycoonSimulation;
 import com.project.tycoon.world.model.Tile;
 import com.project.tycoon.world.model.SnapPoint;
-import com.project.tycoon.world.SnapPointManager;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
-
-import com.project.tycoon.ecs.components.TrailComponent; // Add Import
 
 import java.util.*;
 
@@ -62,7 +59,7 @@ public class GameplayController extends InputAdapter {
     private List<Vector2> pendingTrailTiles = new ArrayList<>();
     private SnapPoint nearbySnapPoint = null; // Currently hovered snap point
     private Vector2 lastPaintedTile = null; // Prevent duplicate painting
-    private static final float SNAP_RADIUS = 3.0f; // tiles
+    private static final float SNAP_RADIUS = 8.0f; // tiles (increased from 3.0 for easier snapping)
 
     public GameplayController(TycoonSimulation simulation, OrthographicCamera camera) {
         this.simulation = simulation;
@@ -82,6 +79,7 @@ public class GameplayController extends InputAdapter {
             currentMode = InteractionMode.TRAIL;
             isBuildingLift = false;
             currentPreview = null;
+            resetTrailState(); // Reset trail state when entering mode
             System.out.println("Switched to Mode: " + currentMode);
             return true;
         } else if (keycode == Input.Keys.M) { // Back to Terrain/Move
@@ -90,6 +88,18 @@ public class GameplayController extends InputAdapter {
             currentPreview = null;
             System.out.println("Switched to Mode: " + currentMode);
             return true;
+        } else if (keycode == Input.Keys.ENTER) {
+            // Confirm trail
+            if (currentMode == InteractionMode.TRAIL && trailBuildState == TrailBuildState.CONFIRMATION_DIALOG) {
+                confirmTrail();
+                return true;
+            }
+        } else if (keycode == Input.Keys.ESCAPE) {
+            // Cancel trail confirmation
+            if (currentMode == InteractionMode.TRAIL && trailBuildState == TrailBuildState.CONFIRMATION_DIALOG) {
+                cancelTrail();
+                return true;
+            }
         }
         return false;
     }
@@ -98,6 +108,17 @@ public class GameplayController extends InputAdapter {
     public boolean mouseMoved(int screenX, int screenY) {
         updateHoveredTile(screenX, screenY);
         updateLiftPreview();
+        
+        // Update nearby snap point for trail mode visual feedback
+        if (currentMode == InteractionMode.TRAIL) {
+            nearbySnapPoint = findNearbySnapPoint(hoveredX, hoveredZ);
+            
+            // Auto-paint when in PAINTING state
+            if (trailBuildState == TrailBuildState.PAINTING) {
+                autoPaintTrailTile();
+            }
+        }
+        
         return false;
     }
 
@@ -116,24 +137,42 @@ public class GameplayController extends InputAdapter {
 
     // Auto-paint trail tiles as cursor moves (snap point system)
     private void autoPaintTrailTile() {
-        Vector2 currentTile = new Vector2(hoveredX, hoveredZ);
+        int radius = 2; // Brush Radius (Diameter ~5 tiles like original)
 
-        // Prevent duplicate painting
-        if (lastPaintedTile != null && lastPaintedTile.equals(currentTile)) {
-            return;
+        for (int z = hoveredZ - radius; z <= hoveredZ + radius; z++) {
+            for (int x = hoveredX - radius; x <= hoveredX + radius; x++) {
+                // Circular Brush
+                float dx = x - hoveredX;
+                float dz = z - hoveredZ;
+                if (dx * dx + dz * dz > (radius + 0.5f) * (radius + 0.5f))
+                    continue; // +0.5 for smoother circle
+
+                Tile tile = simulation.getWorldMap().getTile(x, z);
+                if (tile != null && !tile.isTrail()) {
+                    Vector2 tilePos = new Vector2(x, z);
+                    
+                    // Check if already painted
+                    boolean exists = false;
+                    for (Vector2 v : pendingTrailTiles) {
+                        if ((int) v.x == x && (int) v.y == z) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!exists) {
+                        pendingTrailTiles.add(tilePos);
+                        
+                        // Visual preview: temporarily mark as trail
+                        tile.setTrail(true);
+                        simulation.getWorldMap().setTile(x, z, tile);
+                    }
+                }
+            }
         }
-
-        // Paint this tile
-        Tile tile = simulation.getWorldMap().getTile(hoveredX, hoveredZ);
-        if (tile != null) {
-            pendingTrailTiles.add(currentTile);
-            lastPaintedTile = currentTile;
-
-            // Visual preview: temporarily mark as trail
-            // (will be finalized only on confirmation)
-            tile.setTrail(true);
-            simulation.getWorldMap().setTile(hoveredX, hoveredZ, tile);
-        }
+        
+        // Update last painted to center position
+        lastPaintedTile = new Vector2(hoveredX, hoveredZ);
     }
 
     private void clearTrailCorridor(int centerX, int centerZ) {
@@ -212,9 +251,7 @@ public class GameplayController extends InputAdapter {
                 // Propose ending at snap point
                 if (nearbySnapPoint != null) {
                     proposedEndSnapPoint = nearbySnapPoint;
-                    trailBuildState = TrailBuildState.CONFIRMATION_DIALOG;
-                    System.out.println("Trail proposed to end at " + nearbySnapPoint.getType());
-                    // TODO: Show confirmation dialog
+                    showTrailConfirmationDialog();
                 } else {
                     System.out.println("Must click on snap point to end trail!");
                 }
@@ -224,6 +261,99 @@ public class GameplayController extends InputAdapter {
                 // Handled by dialog UI
                 break;
         }
+    }
+    
+    private void showTrailConfirmationDialog() {
+        float cost = calculateTrailCost();
+        trailBuildState = TrailBuildState.CONFIRMATION_DIALOG;
+        System.out.println("Trail confirmation: " + pendingTrailTiles.size() + " tiles, cost $" + cost);
+        System.out.println("Press ENTER to confirm, ESC to cancel");
+        // TODO: Show actual UI dialog
+    }
+    
+    private float calculateTrailCost() {
+        return pendingTrailTiles.size() * 5.0f; // $5 per tile (very cheap!)
+    }
+    
+    public void confirmTrail() {
+        if (trailBuildState != TrailBuildState.CONFIRMATION_DIALOG) {
+            return;
+        }
+        
+        float cost = calculateTrailCost();
+        if (!economy.canAfford(cost)) {
+            System.out.println("Cannot afford trail! Cost: $" + cost);
+            cancelTrail();
+            return;
+        }
+        
+        // Finalize trail
+        finalizeTrail();
+        
+        // Deduct cost
+        economy.purchase(cost);
+        System.out.println("Trail built for $" + cost + ". Remaining: $" + economy.getCurrentMoney());
+        
+        // Reset to waiting for new trail
+        trailBuildState = TrailBuildState.WAITING_FOR_START;
+        trailStartSnapPoint = null;
+        proposedEndSnapPoint = null;
+        pendingTrailTiles.clear();
+        nearbySnapPoint = null;
+        lastPaintedTile = null;
+    }
+    
+    public void cancelTrail() {
+        if (trailBuildState == TrailBuildState.CONFIRMATION_DIALOG) {
+            // Go back to painting
+            trailBuildState = TrailBuildState.PAINTING;
+            System.out.println("Trail confirmation cancelled, back to painting");
+        } else {
+            // Full cancel
+            resetTrailState();
+        }
+    }
+    
+    private void finalizeTrail() {
+        // Clear obstacles along trail
+        for (Vector2 tile : pendingTrailTiles) {
+            clearTrailCorridor((int)tile.x, (int)tile.y);
+        }
+        
+        // Get start and end positions
+        Vector2 startTile = pendingTrailTiles.get(0);
+        Vector2 endTile = pendingTrailTiles.get(pendingTrailTiles.size() - 1);
+        
+        // Create TRAIL_START snap point at beginning
+        SnapPoint trailStart = new SnapPoint(
+            startTile.x, startTile.y,
+            SnapPoint.SnapPointType.TRAIL_START,
+            null // No owner entity for trail segments
+        );
+        simulation.getSnapPointManager().registerSnapPoint(trailStart);
+        
+        // Create TRAIL_END snap point at end
+        SnapPoint trailEnd = new SnapPoint(
+            endTile.x, endTile.y,
+            SnapPoint.SnapPointType.TRAIL_END,
+            null
+        );
+        simulation.getSnapPointManager().registerSnapPoint(trailEnd);
+        
+        // Connect start snap point to trail start
+        simulation.getSnapPointManager().connectSnapPoints(
+            trailStartSnapPoint.getId(), 
+            trailStart.getId()
+        );
+        
+        // Connect trail end to end snap point
+        simulation.getSnapPointManager().connectSnapPoints(
+            trailEnd.getId(), 
+            proposedEndSnapPoint.getId()
+        );
+        
+        System.out.println("Trail created from " + trailStartSnapPoint.getType() + 
+                          " to " + proposedEndSnapPoint.getType());
     }
     
     private void resetTrailState() {
@@ -311,6 +441,9 @@ public class GameplayController extends InputAdapter {
                     }
 
                     Entity prevPylon = null;
+                    Entity firstPylon = null;
+                    Entity lastPylon = null;
+                    
                     for (Vector2 pos : currentPreview.pylonPositions) {
                         Entity pylon = simulation.getEcsEngine().createEntity();
 
@@ -329,8 +462,33 @@ public class GameplayController extends InputAdapter {
                             simulation.getEcsEngine().getComponent(prevPylon, LiftComponent.class).nextPylonId = pylon
                                     .getId();
                             System.out.println("Linked Pylon " + prevPylon.getId() + " to " + pylon.getId());
+                        } else {
+                            firstPylon = pylon; // First pylon
                         }
+                        
                         prevPylon = pylon;
+                        lastPylon = pylon; // Keep track of last pylon
+                    }
+                    
+                    // Create snap points for lift bottom and top
+                    if (firstPylon != null) {
+                        TransformComponent firstT = simulation.getEcsEngine().getComponent(firstPylon, TransformComponent.class);
+                        SnapPoint liftBottom = new SnapPoint(
+                            firstT.x, firstT.z,
+                            SnapPoint.SnapPointType.LIFT_BOTTOM,
+                            firstPylon.getId()
+                        );
+                        simulation.getSnapPointManager().registerSnapPoint(liftBottom);
+                    }
+                    
+                    if (lastPylon != null && lastPylon != firstPylon) {
+                        TransformComponent lastT = simulation.getEcsEngine().getComponent(lastPylon, TransformComponent.class);
+                        SnapPoint liftTop = new SnapPoint(
+                            lastT.x, lastT.z,
+                            SnapPoint.SnapPointType.LIFT_TOP,
+                            lastPylon.getId()
+                        );
+                        simulation.getSnapPointManager().registerSnapPoint(liftTop);
                     }
 
                     // Deduct cost
@@ -386,5 +544,15 @@ public class GameplayController extends InputAdapter {
 
     public LiftComponent.LiftType getSelectedLiftType() {
         return selectedLiftType;
+    }
+    
+    // ==== SNAP POINT VISUAL FEEDBACK ====
+    
+    public boolean isValidSnapPointNearby() {
+        return nearbySnapPoint != null;
+    }
+    
+    public SnapPoint getNearbySnapPoint() {
+        return nearbySnapPoint;
     }
 }

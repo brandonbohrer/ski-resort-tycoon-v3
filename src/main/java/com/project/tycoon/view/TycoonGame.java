@@ -71,7 +71,7 @@ public class TycoonGame extends Game {
         multiplexer.addProcessor(cameraController); // Camera last
         Gdx.input.setInputProcessor(multiplexer);
 
-        combinedRenderer = new CombinedRenderer(simulation.getWorldMap(), simulation.getEcsEngine());
+        combinedRenderer = new CombinedRenderer(simulation.getWorldMap(), simulation.getEcsEngine(), simulation.getSnapPointManager());
     }
 
     @Override
@@ -100,9 +100,11 @@ public class TycoonGame extends Game {
         ScreenUtils.clear(Color.SKY, true);
 
         // Pass gameplay controller to renderer to draw selection cursor
-        boolean isBuildMode = gameplayController.getCurrentMode() == GameplayController.InteractionMode.BUILD;
+        boolean isBuildMode = gameplayController.getCurrentMode() == GameplayController.InteractionMode.BUILD
+                || gameplayController.getCurrentMode() == GameplayController.InteractionMode.TRAIL;
+        boolean isValidSnapPoint = gameplayController.isValidSnapPointNearby();
         combinedRenderer.render(camera, gameplayController.getHoveredX(), gameplayController.getHoveredZ(), isBuildMode,
-                gameplayController.getCurrentPreview());
+                isValidSnapPoint, gameplayController.getCurrentPreview());
 
         // 3. Render UI (On top)
         gameHUD.render((float) deltaTime);

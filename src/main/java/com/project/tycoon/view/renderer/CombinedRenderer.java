@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
 import com.project.tycoon.ecs.Engine;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
 import com.project.tycoon.world.model.WorldMap;
+import com.project.tycoon.world.SnapPointManager;
 
 /**
  * Master Renderer that orchestrates sub-renderers.
@@ -22,7 +23,7 @@ public class CombinedRenderer {
     private final TerrainRenderer terrainRenderer;
     private final EntityRenderer entityRenderer;
 
-    public CombinedRenderer(WorldMap worldMap, Engine ecsEngine) {
+    public CombinedRenderer(WorldMap worldMap, Engine ecsEngine, SnapPointManager snapPointManager) {
         this.modelBatch = new ModelBatch();
         
         // Setup Lighting
@@ -33,10 +34,10 @@ public class CombinedRenderer {
         // Initialize Sub-systems
         this.assetManager = new RenderAssetManager();
         this.terrainRenderer = new TerrainRenderer(worldMap, assetManager);
-        this.entityRenderer = new EntityRenderer(ecsEngine, worldMap, assetManager);
+        this.entityRenderer = new EntityRenderer(ecsEngine, worldMap, assetManager, snapPointManager);
     }
 
-    public void render(OrthographicCamera camera, int hoveredX, int hoveredZ, boolean isBuildMode, LiftPreview preview) {
+    public void render(OrthographicCamera camera, int hoveredX, int hoveredZ, boolean isBuildMode, boolean isValidSnapPoint, LiftPreview preview) {
         // Update logic (e.g. terrain rebuild if dirty)
         terrainRenderer.update();
 
@@ -44,7 +45,7 @@ public class CombinedRenderer {
         
         // Delegate rendering
         terrainRenderer.render(modelBatch, environment);
-        entityRenderer.render(modelBatch, environment, hoveredX, hoveredZ, isBuildMode, preview);
+        entityRenderer.render(modelBatch, environment, hoveredX, hoveredZ, isBuildMode, isValidSnapPoint, preview);
         
         modelBatch.end();
     }

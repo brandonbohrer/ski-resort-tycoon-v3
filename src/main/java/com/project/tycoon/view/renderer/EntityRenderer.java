@@ -19,6 +19,8 @@ import com.project.tycoon.view.util.IsoUtils;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
 import com.project.tycoon.world.model.Tile;
 import com.project.tycoon.world.model.WorldMap;
+import com.project.tycoon.world.model.SnapPoint;
+import com.project.tycoon.world.SnapPointManager;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,15 +31,17 @@ public class EntityRenderer {
     private final Engine ecsEngine;
     private final RenderAssetManager assets;
     private final WorldMap worldMap; // For height lookups for cursor/preview
+    private final SnapPointManager snapPointManager; // For rendering snap points
 
-    public EntityRenderer(Engine ecsEngine, WorldMap worldMap, RenderAssetManager assets) {
+    public EntityRenderer(Engine ecsEngine, WorldMap worldMap, RenderAssetManager assets, SnapPointManager snapPointManager) {
         this.ecsEngine = ecsEngine;
         this.worldMap = worldMap;
         this.assets = assets;
+        this.snapPointManager = snapPointManager;
     }
 
     public void render(ModelBatch batch, Environment environment, int hoveredX, int hoveredZ, boolean isBuildMode,
-            LiftPreview preview) {
+            boolean isValidSnapPoint, LiftPreview preview) {
         // Cache Transforms
         Map<UUID, TransformComponent> transformCache = new HashMap<>();
         for (Entity entity : ecsEngine.getEntities()) {
@@ -80,7 +84,15 @@ public class EntityRenderer {
             Tile t = worldMap.getTile(hoveredX, hoveredZ);
             if (t != null) {
                 float h = t.getHeight() * IsoUtils.HEIGHT_SCALE;
-                Color cursorColor = isBuildMode ? Color.BLUE : Color.YELLOW;
+                
+                // Color cursor based on mode and snap point validity
+                Color cursorColor;
+                if (isBuildMode) {
+                    cursorColor = isValidSnapPoint ? Color.GREEN : Color.RED;
+                } else {
+                    cursorColor = Color.YELLOW;
+                }
+                
                 renderModelAt(batch, environment, assets.cursorModel, hoveredX, h + 0.1f, hoveredZ, cursorColor);
             }
         }
@@ -94,6 +106,38 @@ public class EntityRenderer {
                 Tile t = worldMap.getTile(x, z);
                 float h = (t != null) ? t.getHeight() * IsoUtils.HEIGHT_SCALE : 0;
                 renderModelAt(batch, environment, assets.liftPylonModel, x, h, z, ghostColor);
+            }
+        }
+        
+        // Render Snap Points (visual indicators in trail mode)
+        if (isBuildMode) {
+            for (SnapPoint sp : snapPointManager.getAllSnapPoints()) {
+                Tile t = worldMap.getTile((int)sp.getX(), (int)sp.getZ());
+                float h = (t != null) ? t.getHeight() * IsoUtils.HEIGHT_SCALE : 0;
+                
+                // Color based on snap point type
+                Color snapColor;
+                switch (sp.getType()) {
+                    case BASE_CAMP:
+                        snapColor = new Color(0.2f, 0.8f, 1.0f, 0.8f); // Cyan
+                        break;
+                    case LIFT_BOTTOM:
+                        snapColor = new Color(1.0f, 1.0f, 0.0f, 0.8f); // Yellow
+                        break;
+                    case LIFT_TOP:
+                        snapColor = new Color(1.0f, 0.5f, 0.0f, 0.8f); // Orange
+                        break;
+                    case TRAIL_START:
+                        snapColor = new Color(0.0f, 1.0f, 0.0f, 0.8f); // Green
+                        break;
+                    case TRAIL_END:
+                        snapColor = new Color(0.8f, 0.0f, 1.0f, 0.8f); // Purple
+                        break;
+                    default:
+                        snapColor = new Color(1.0f, 1.0f, 1.0f, 0.8f); // White
+                }
+                
+                renderModelAt(batch, environment, assets.cursorModel, sp.getX(), h + 0.5f, sp.getZ(), snapColor);
             }
         }
     }
