@@ -22,6 +22,7 @@ import com.project.tycoon.ecs.components.TrailComponent; // Add Import
 public class GameplayController extends InputAdapter {
 
     public enum InteractionMode {
+        NONE, // Default - no interaction
         TERRAIN,
         BUILD,
         TRAIL // New Mode
@@ -31,7 +32,7 @@ public class GameplayController extends InputAdapter {
     private final MousePicker mousePicker;
     private final EconomyManager economy;
 
-    private InteractionMode currentMode = InteractionMode.TERRAIN;
+    private InteractionMode currentMode = InteractionMode.NONE;
 
     // Hover state
     private int hoveredX = -1;
@@ -298,12 +299,12 @@ public class GameplayController extends InputAdapter {
     public LiftPreview getCurrentPreview() {
         return currentPreview;
     }
-    
+
     public void setSelectedLiftType(LiftComponent.LiftType type) {
         this.selectedLiftType = type;
         System.out.println("Selected lift type: " + type);
     }
-    
+
     public LiftComponent.LiftType getSelectedLiftType() {
         return selectedLiftType;
     }
