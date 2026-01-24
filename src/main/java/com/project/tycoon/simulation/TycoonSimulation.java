@@ -1,10 +1,11 @@
 package com.project.tycoon.simulation;
 
 import com.project.tycoon.ecs.Engine;
-import com.project.tycoon.ecs.systems.LiftSystem;
-import com.project.tycoon.ecs.systems.PhysicsSystem;
-import com.project.tycoon.ecs.systems.SkierBehaviorSystem;
-import com.project.tycoon.ecs.systems.SkierSpawnerSystem;
+import com.project.tycoon.ecs.systems.core.PhysicsSystem;
+import com.project.tycoon.ecs.systems.lift.LiftSystem;
+import com.project.tycoon.ecs.systems.skier.SkierBehaviorSystem;
+import com.project.tycoon.ecs.systems.skier.SkierPhysicsSystem;
+import com.project.tycoon.ecs.systems.skier.SkierSpawnerSystem;
 import com.project.tycoon.economy.EconomyManager;
 import com.project.tycoon.world.model.TerrainGenerator;
 import com.project.tycoon.world.model.WorldMap;
@@ -30,9 +31,10 @@ public class TycoonSimulation implements Simulation {
         TerrainGenerator.generateMountain(this.worldMap);
 
         // Register Systems
-        ecsEngine.addSystem(new SkierBehaviorSystem(ecsEngine, worldMap));
-        ecsEngine.addSystem(new LiftSystem(ecsEngine, economyManager));
-        ecsEngine.addSystem(new PhysicsSystem(ecsEngine, worldMap));
+        ecsEngine.addSystem(new PhysicsSystem(ecsEngine, worldMap)); // General physics
+        ecsEngine.addSystem(new SkierPhysicsSystem(ecsEngine, worldMap)); // Skiing slope physics
+        ecsEngine.addSystem(new SkierBehaviorSystem(ecsEngine, worldMap)); // Skier AI/behavior
+        ecsEngine.addSystem(new LiftSystem(ecsEngine, economyManager)); // Lift operations
         ecsEngine.addSystem(new SkierSpawnerSystem(ecsEngine, worldMap)); // Dynamic spawning
     }
 

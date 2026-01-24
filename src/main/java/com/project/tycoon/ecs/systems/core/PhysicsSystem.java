@@ -1,4 +1,4 @@
-package com.project.tycoon.ecs.systems;
+package com.project.tycoon.ecs.systems.core;
 
 import com.project.tycoon.ecs.Engine;
 import com.project.tycoon.ecs.Entity;

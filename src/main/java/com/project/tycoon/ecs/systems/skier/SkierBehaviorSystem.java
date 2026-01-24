@@ -1,4 +1,4 @@
-package com.project.tycoon.ecs.systems;
+package com.project.tycoon.ecs.systems.skier;
 
 import com.project.tycoon.ecs.Engine;
 import com.project.tycoon.ecs.Entity;
@@ -17,7 +17,6 @@ public class SkierBehaviorSystem implements System {
     private final Engine engine;
     private final WorldMap map;
 
-    private static final float GRAVITY = 5.0f;
     private static final float BASE_SKI_SPEED = 4.0f;
     private static final float MAX_SKI_SPEED = 10.0f;
     private static final float TRAIL_SEEK_SPEED = 3.5f;
@@ -92,16 +91,10 @@ public class SkierBehaviorSystem implements System {
             if (next != null) {
                 steerTowardTile(pos, vel, next.x, next.z, skier, next.heightDrop);
             } else {
-                boolean moved = steerTowardNearestTrail(pos, vel, skier);
-                if (!moved) {
-                    applySlopePhysics(pos, vel, dt);
-                }
+                steerTowardNearestTrail(pos, vel, skier);
             }
         } else {
-            boolean moved = steerTowardNearestTrail(pos, vel, skier);
-            if (!moved) {
-                applySlopePhysics(pos, vel, dt);
-            }
+            steerTowardNearestTrail(pos, vel, skier);
         }
 
         // Keep skier snapped to terrain height
@@ -346,44 +339,6 @@ public class SkierBehaviorSystem implements System {
         float speed = 3.0f;
         vel.dx = (dx / distance) * speed;
         vel.dz = (dz / distance) * speed;
-    }
-
-    private void applySlopePhysics(TransformComponent pos, VelocityComponent vel, double dt) {
-        int x = (int) pos.x;
-        int z = (int) pos.z;
-
-        if (!map.isValid(x, z))
-            return;
-
-        // Calculate Local Gradient
-        // Compare height with neighbors to find "Downhill" direction
-        Tile current = map.getTile(x, z);
-
-        // Sample neighbors in ALL directions for accurate gradient (central difference)
-        Tile left = map.getTile(x - 1, z);
-        Tile right = map.getTile(x + 1, z);
-        Tile up = map.getTile(x, z - 1);
-        Tile down = map.getTile(x, z + 1);
-
-        float h = current.getHeight();
-        float hLeft = (left != null) ? left.getHeight() : h;
-        float hRight = (right != null) ? right.getHeight() : h;
-        float hUp = (up != null) ? up.getHeight() : h;
-        float hDown = (down != null) ? down.getHeight() : h;
-
-        // Central difference gradient (more accurate and bidirectional)
-        // Positive gradient = uphill in that direction
-        float gradientX = (hRight - hLeft) / 2.0f;
-        float gradientZ = (hDown - hUp) / 2.0f;
-
-        // Apply forces downhill (opposite of gradient direction)
-        // Negative gradient = downhill = accelerate in that direction
-        float delta = (float) dt;
-        vel.dx -= gradientX * GRAVITY * delta;
-        vel.dz -= gradientZ * GRAVITY * delta;
-
-        // Snap Y to terrain height (simple collision)
-        pos.y = h;
     }
 
     private boolean steerTowardNearestTrail(TransformComponent pos, VelocityComponent vel, SkierComponent skier) {
