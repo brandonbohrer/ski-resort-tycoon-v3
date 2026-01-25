@@ -11,6 +11,7 @@ import com.project.tycoon.ecs.systems.skier.SkierPhysicsSystem;
 import com.project.tycoon.ecs.systems.skier.SkierSpawnerSystem;
 import com.project.tycoon.economy.EconomyManager;
 import com.project.tycoon.world.SnapPointManager;
+import com.project.tycoon.world.model.BaseCampLocation;
 import com.project.tycoon.world.model.SnapPoint;
 import com.project.tycoon.world.model.TerrainGenerator;
 import com.project.tycoon.world.model.WorldMap;
@@ -27,6 +28,7 @@ public class TycoonSimulation implements Simulation {
     private final DayTimeSystem dayTimeSystem;
     private final VisitorManager visitorManager;
     private final SnapPointManager snapPointManager;
+    private final BaseCampLocation baseCampLocation;
 
     private boolean paused = false;
     private float timeScale = 1.0f; // 1x, 2x, or 3x speed
@@ -37,15 +39,17 @@ public class TycoonSimulation implements Simulation {
         this.worldMap = new WorldMap(256, 256);
         this.economyManager = new EconomyManager();
 
-        // Generate Mountain Terrain
-        TerrainGenerator.generateMountain(this.worldMap);
+        // Generate Mountain Terrain with random seed
+        long seed = System.currentTimeMillis();
+        System.out.println("Generating map with seed: " + seed);
+        this.baseCampLocation = TerrainGenerator.generateMountain(this.worldMap, seed);
 
         // Initialize managers
         this.dayTimeSystem = new DayTimeSystem();
         this.visitorManager = new VisitorManager();
         this.snapPointManager = new SnapPointManager();
 
-        // Create base camp
+        // Create base camp at optimal location
         createBaseCamp();
 
         // Setup day transition listeners
@@ -134,13 +138,14 @@ public class TycoonSimulation implements Simulation {
     }
 
     /**
-     * Create the base camp building at the bottom of the mountain.
+     * Create the base camp building at the optimal location found by terrain
+     * generator.
      */
     private void createBaseCamp() {
-        // Base camp location (center bottom of map)
-        int baseCampX = worldMap.getWidth() / 2;
-        int baseCampZ = worldMap.getDepth() - 6; // Near bottom
-        float baseCampHeight = worldMap.getTile(baseCampX, baseCampZ).getHeight();
+        // Use location determined by terrain generator (flattest spot in base zone)
+        int baseCampX = baseCampLocation.x;
+        int baseCampZ = baseCampLocation.z;
+        float baseCampHeight = baseCampLocation.height;
 
         // Create base camp entity
         Entity baseCamp = ecsEngine.createEntity();
