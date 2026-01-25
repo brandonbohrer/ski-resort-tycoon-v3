@@ -87,7 +87,16 @@ public class SkierBehaviorSystem implements System {
             return;
         }
 
-        // Check if reached base area
+        // ⭐ FIRST: Check if near target lift (before base check!)
+        if (liftDetector.isNearTargetLift(pos, skier.targetLiftId)) {
+            java.lang.System.out.println("🎯 BEHAVIOR: Skier near TARGET lift at (" + Math.round(pos.x) + "," + Math.round(pos.z) + ") → WAITING");
+            vel.dx = 0;
+            vel.dz = 0;
+            skier.state = SkierComponent.State.WAITING;
+            return;
+        }
+
+        // Check if reached base area (only if no target lift or past target)
         if (z >= SkierSpawnerSystem.BASE_Z - 2) {
             vel.dx = 0;
             vel.dz = 0;
@@ -102,15 +111,6 @@ public class SkierBehaviorSystem implements System {
             return;
         }
 
-        // Check if near a lift base (for mid-mountain boarding)
-        if (liftDetector.isNearLiftBase(pos)) {
-            java.lang.System.out.println("🛑 BEHAVIOR: Skier near lift at (" + Math.round(pos.x) + "," + Math.round(pos.z) + ") → WAITING");
-            vel.dx = 0;
-            vel.dz = 0;
-            skier.state = SkierComponent.State.WAITING;
-            return;
-        }
-
         // Choose target difficulty if not already chosen
         if (skier.targetTrailDifficulty == null) {
             skier.targetTrailDifficulty = chooseTrailDifficulty(skier);
@@ -120,7 +120,13 @@ public class SkierBehaviorSystem implements System {
             // On trail: update satisfaction and apply carving
             TrailDifficulty currentDifficulty = current.getTrailDifficulty();
             updateSatisfaction(skier, currentDifficulty, dt);
-            carvingPhysics.applyCarving(skier, pos, vel, dt);
+            
+            // ⭐ NEW: Steer toward target lift while skiing
+            if (skier.targetLiftId != null) {
+                steerTowardTargetLift(skier, pos, vel, dt);
+            } else {
+                carvingPhysics.applyCarving(skier, pos, vel, dt);
+            }
         } else {
             // Off trail: seek back to trails
             java.lang.System.out.println("⚠️  BEHAVIOR: Skier at (" + Math.round(pos.x) + "," + Math.round(pos.z) + ") off-trail, seeking trail");
@@ -132,6 +138,54 @@ public class SkierBehaviorSystem implements System {
 
         // Keep skier snapped to terrain height
         pos.y = current.getHeight();
+    }
+    
+    /**
+     * Steer skier toward their target lift while skiing down.
+     */
+    private void steerTowardTargetLift(SkierComponent skier, TransformComponent pos, VelocityComponent vel, double dt) {
+        // Find target lift position
+        Entity targetLift = null;
+        for (Entity entity : engine.getEntities()) {
+            if (entity.getId().equals(skier.targetLiftId)) {
+                targetLift = entity;
+                break;
+            }
+        }
+        
+        if (targetLift == null) {
+            // Target lift not found, just ski normally
+            carvingPhysics.applyCarving(skier, pos, vel, dt);
+            return;
+        }
+        
+        TransformComponent liftPos = engine.getComponent(targetLift, TransformComponent.class);
+        if (liftPos == null) {
+            carvingPhysics.applyCarving(skier, pos, vel, dt);
+            return;
+        }
+        
+        // Calculate direction to target lift
+        float dx = liftPos.x - pos.x;
+        float dz = liftPos.z - pos.z;
+        float distance = (float) Math.sqrt(dx * dx + dz * dz);
+        
+        if (distance < 0.1f) {
+            carvingPhysics.applyCarving(skier, pos, vel, dt);
+            return;
+        }
+        
+        // Normalize direction
+        float targetDx = dx / distance;
+        float targetDz = dz / distance;
+        
+        // Get current carving velocity
+        carvingPhysics.applyCarving(skier, pos, vel, dt);
+        
+        // Blend toward target (70% carving, 30% steering toward target)
+        float steerWeight = 0.3f;
+        vel.dx = vel.dx * (1 - steerWeight) + targetDx * 4.0f * steerWeight;
+        vel.dz = vel.dz * (1 - steerWeight) + targetDz * 4.0f * steerWeight;
     }
 
     /**

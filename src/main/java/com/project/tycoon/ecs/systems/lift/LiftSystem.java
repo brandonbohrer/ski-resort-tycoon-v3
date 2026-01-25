@@ -8,6 +8,9 @@ import com.project.tycoon.ecs.components.SkierComponent;
 import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.ecs.components.VelocityComponent;
 import com.project.tycoon.economy.EconomyManager;
+import com.project.tycoon.ecs.systems.skier.LiftPlanner;
+import com.project.tycoon.world.SnapPointManager;
+import com.project.tycoon.world.model.WorldMap;
 
 import java.util.*;
 
@@ -19,6 +22,8 @@ public class LiftSystem implements System {
 
     private final Engine engine;
     private final EconomyManager economy;
+    private final LiftPlanner liftPlanner;
+    private final WorldMap worldMap;
 
     // Queue per lift: Map<liftBaseEntityId, List<skierEntityId>>
     private final Map<UUID, List<UUID>> liftQueues = new HashMap<>();
@@ -27,12 +32,14 @@ public class LiftSystem implements System {
     private final Map<UUID, Float> boardingTimers = new HashMap<>();
     private static final float BOARDING_INTERVAL = 2.0f;
 
-    // Detection radius for lift base (must match SkierNavigationSystem's DETECTION_RADIUS)
-    private static final float QUEUE_DETECTION_RADIUS = 8.0f;
+    // Detection radius for lift base (increased for better mid-mountain boarding)
+    private static final float QUEUE_DETECTION_RADIUS = 15.0f;
 
-    public LiftSystem(Engine engine, EconomyManager economy) {
+    public LiftSystem(Engine engine, EconomyManager economy, SnapPointManager snapPointManager, WorldMap worldMap) {
         this.engine = engine;
         this.economy = economy;
+        this.worldMap = worldMap;
+        this.liftPlanner = new LiftPlanner(engine, snapPointManager, worldMap);
     }
 
     @Override
@@ -264,15 +271,51 @@ public class LiftSystem implements System {
             if (lift != null && lift.nextPylonId == null) {
                 TransformComponent topPos = engine.getComponent(currentPylon, TransformComponent.class);
                 if (topPos != null) {
-                    // Position skier slightly ahead of top pylon
-                    skierPos.x = topPos.x + 2;
-                    skierPos.y = topPos.y;
-                    skierPos.z = topPos.z + 2;
+                    // Position skier ON a trail near the top pylon
+                    boolean foundTrail = false;
+                    
+                    // Search for nearest trail tile near lift top
+                    for (int radius = 1; radius <= 15 && !foundTrail; radius++) {
+                        for (int dz = -radius; dz <= radius && !foundTrail; dz++) {
+                            for (int dx = -radius; dx <= radius && !foundTrail; dx++) {
+                                int testX = (int)Math.floor(topPos.x) + dx;
+                                int testZ = (int)Math.floor(topPos.z) + dz;
+                                
+                                if (worldMap.isValid(testX, testZ)) {
+                                    com.project.tycoon.world.model.Tile tile = worldMap.getTile(testX, testZ);
+                                    if (tile != null && tile.isTrail()) {
+                                        skierPos.x = testX + 0.5f;
+                                        skierPos.y = tile.getHeight();
+                                        skierPos.z = testZ + 0.5f;
+                                        foundTrail = true;
+                                        java.lang.System.out.println("✅ LIFT RELEASE: Placed skier on trail at (" + testX + "," + testZ + ")");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Fallback: if no trail found, use old position
+                    if (!foundTrail) {
+                        skierPos.x = topPos.x + 2;
+                        skierPos.y = topPos.y;
+                        skierPos.z = topPos.z + 2;
+                        java.lang.System.out.println("⚠️  LIFT RELEASE: No trail found near lift top, using default position");
+                    }
                 }
 
                 // Transition to SKIING
                 skier.state = SkierComponent.State.SKIING;
-                skier.targetLiftId = null;
+                
+                // ⭐ NEW: Plan next lift target based on skill level
+                UUID nextLiftTarget = liftPlanner.chooseNextLift(skier, skierPos);
+                skier.targetLiftId = nextLiftTarget;
+                
+                if (nextLiftTarget != null) {
+                    java.lang.System.out.println("🎯 LIFT: Released skier, targeting specific lift: " + nextLiftTarget);
+                } else {
+                    java.lang.System.out.println("⬇️  LIFT: Released skier, no target lift (will ski to base)");
+                }
             }
         }
     }

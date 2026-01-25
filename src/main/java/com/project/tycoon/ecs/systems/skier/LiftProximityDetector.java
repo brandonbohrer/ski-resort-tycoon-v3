@@ -14,7 +14,7 @@ import java.util.UUID;
  */
 public class LiftProximityDetector {
     
-    private static final float DETECTION_RADIUS = 8.0f; // Must match LiftSystem.QUEUE_DETECTION_RADIUS
+    private static final float DETECTION_RADIUS = 15.0f; // Increased from 8.0f for better mid-mountain detection
     
     private final Engine engine;
     
@@ -63,6 +63,41 @@ public class LiftProximityDetector {
         }
         
         return false;
+    }
+    
+    /**
+     * Check if a skier is near their TARGET lift specifically.
+     * 
+     * @param skierPos The skier's position
+     * @param targetLiftId The lift entity ID the skier is targeting (can be null)
+     * @return true if within detection radius of the target lift base
+     */
+    public boolean isNearTargetLift(TransformComponent skierPos, UUID targetLiftId) {
+        if (targetLiftId == null) {
+            // If no target, check if near any lift (base area behavior)
+            return isNearLiftBase(skierPos);
+        }
+        
+        // Find the target lift entity
+        Entity targetLift = null;
+        for (Entity entity : engine.getEntities()) {
+            if (entity.getId().equals(targetLiftId)) {
+                targetLift = entity;
+                break;
+            }
+        }
+        
+        if (targetLift == null || !engine.hasComponent(targetLift, TransformComponent.class)) {
+            return false;
+        }
+        
+        TransformComponent liftPos = engine.getComponent(targetLift, TransformComponent.class);
+        
+        float dx = liftPos.x - skierPos.x;
+        float dz = liftPos.z - skierPos.z;
+        float distance = (float) Math.sqrt(dx * dx + dz * dz);
+        
+        return distance < DETECTION_RADIUS;
     }
 }
 

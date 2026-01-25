@@ -75,7 +75,7 @@ public class TycoonSimulation implements Simulation {
         ecsEngine.addSystem(new SkierPhysicsSystem(ecsEngine, worldMap)); // Skiing slope physics
         ecsEngine.addSystem(new com.project.tycoon.ecs.systems.skier.SkierNavigationSystem(ecsEngine, snapPointManager)); // High-level navigation
         ecsEngine.addSystem(new SkierBehaviorSystem(ecsEngine, worldMap)); // Skier AI/behavior
-        ecsEngine.addSystem(new LiftSystem(ecsEngine, economyManager)); // Lift operations
+        ecsEngine.addSystem(new LiftSystem(ecsEngine, economyManager, snapPointManager, worldMap)); // Lift operations with lift planning
 
         SkierSpawnerSystem spawnerSystem = new SkierSpawnerSystem(ecsEngine, worldMap);
         spawnerSystem.setVisitorManager(visitorManager); // Inject visitor manager
