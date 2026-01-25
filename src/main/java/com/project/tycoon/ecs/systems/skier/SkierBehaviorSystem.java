@@ -97,7 +97,7 @@ public class SkierBehaviorSystem implements System {
         if (current.isTrail()) {
             // Check if current trail matches preference
             TrailDifficulty currentDifficulty = current.getTrailDifficulty();
-            updateSatisfaction(skier, currentDifficulty);
+            updateSatisfaction(skier, currentDifficulty, dt);
 
             // REALISTIC SKIING: Use carving system instead of simple flow
             handleCarvingSkiing(skier, pos, vel, dt);
@@ -394,31 +394,6 @@ public class SkierBehaviorSystem implements System {
         return true;
     }
 
-    private void steerTowardTile(TransformComponent pos, VelocityComponent vel, int tileX, int tileZ,
-            SkierComponent skier, int heightDrop) {
-        float targetX = tileX + 0.5f;
-        float targetZ = tileZ + 0.5f;
-
-        float dx = targetX - pos.x;
-        float dz = targetZ - pos.z;
-        float dist = (float) Math.sqrt(dx * dx + dz * dz);
-
-        if (dist < 0.05f) {
-            return;
-        }
-
-        // Convert skill level to numeric value (0-3 maps to different speed bonuses)
-        float skillMultiplier = skier.skillLevel.ordinal() * 0.8f; // 0, 0.8, 1.6, 2.4
-        float desiredSpeed = BASE_SKI_SPEED + skillMultiplier + Math.max(0, heightDrop) * 0.6f;
-        desiredSpeed = Math.min(desiredSpeed, MAX_SKI_SPEED);
-
-        float desiredDx = (dx / dist) * desiredSpeed;
-        float desiredDz = (dz / dist) * desiredSpeed;
-
-        vel.dx = lerp(vel.dx, desiredDx, TURN_LERP);
-        vel.dz = lerp(vel.dz, desiredDz, TURN_LERP);
-    }
-
     private void steerTowardTileAtSpeed(TransformComponent pos, VelocityComponent vel, int tileX, int tileZ,
             float speed) {
         float targetX = tileX + 0.5f;
@@ -537,17 +512,20 @@ public class SkierBehaviorSystem implements System {
     /**
      * Update skier satisfaction based on trail difficulty match.
      */
-    private void updateSatisfaction(SkierComponent skier, TrailDifficulty trailDifficulty) {
-        // Only update once per trail (simple debounce using a flag would be better)
-        // For now, we'll update continuously but the satisfaction change is clamped
-        float change = TrailPreferences.getSatisfactionChange(skier.skillLevel, trailDifficulty) * 0.01f; // Small
-                                                                                                          // increments
+    private void updateSatisfaction(SkierComponent skier, TrailDifficulty trailDifficulty, double dt) {
+        // Satisfaction change based on preference (-15 to +15)
+        float rawChange = TrailPreferences.getSatisfactionChange(skier.skillLevel, trailDifficulty);
+
+        // Apply change rate per second
+        // Previous was ~9.0/sec (too fast). New target: ~2.0/sec
+        // 15 * 0.15 = 2.25/sec
+        float change = rawChange * (float) dt * 0.15f;
 
         skier.satisfaction += change;
         skier.satisfaction = Math.max(0, Math.min(100, skier.satisfaction)); // Clamp 0-100
 
         // Leave if too unhappy
-        if (skier.satisfaction < 20) {
+        if (skier.satisfaction < 10) { // Lower threshold to 10 to be more forgiving
             skier.state = SkierComponent.State.FINISHED;
         }
     }
