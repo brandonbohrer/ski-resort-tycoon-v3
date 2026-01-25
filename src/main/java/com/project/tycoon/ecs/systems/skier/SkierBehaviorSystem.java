@@ -525,9 +525,9 @@ public class SkierBehaviorSystem implements System {
         skier.satisfaction = Math.max(0, Math.min(100, skier.satisfaction)); // Clamp 0-100
 
         // Leave if too unhappy
-        if (skier.satisfaction < 10) { // Lower threshold to 10 to be more forgiving
-            skier.state = SkierComponent.State.FINISHED;
-        }
+        // if (skier.satisfaction < 10) {
+        // skier.state = SkierComponent.State.FINISHED;
+        // }
     }
 
     /**

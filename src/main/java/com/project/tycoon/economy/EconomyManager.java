@@ -16,7 +16,7 @@ public class EconomyManager {
     private float lastDailyRevenue; // Yesterday's revenue for display
 
     // Configuration constants
-    public static final float STARTING_MONEY = 15000f;
+    public static final float STARTING_MONEY = 500000f;
     public static final float TICKET_PRICE = 8f;
 
     public EconomyManager() {
