@@ -88,6 +88,7 @@ public class TrailSeeker {
         int bestZ = -1;
         float bestDistSq = Float.MAX_VALUE;
         
+        // Try normal radius first
         for (int dz = -SEARCH_RADIUS; dz <= SEARCH_RADIUS; dz++) {
             for (int dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
                 if (dx == 0 && dz == 0) {
@@ -115,7 +116,40 @@ public class TrailSeeker {
             }
         }
         
+        // FALLBACK: If no trail found, try MUCH larger radius (30 tiles)
         if (bestX == -1) {
+            for (int dz = -30; dz <= 30; dz++) {
+                for (int dx = -30; dx <= 30; dx++) {
+                    if (dx == 0 && dz == 0) {
+                        continue;
+                    }
+                    
+                    int nx = x + dx;
+                    int nz = z + dz;
+                    
+                    if (!map.isValid(nx, nz)) {
+                        continue;
+                    }
+                    
+                    Tile tile = map.getTile(nx, nz);
+                    if (tile == null || !tile.isTrail()) {
+                        continue;
+                    }
+                    
+                    float distSq = dx * dx + dz * dz;
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        bestX = nx;
+                        bestZ = nz;
+                    }
+                }
+            }
+        }
+        
+        // LAST RESORT: If still no trail, just move downhill (toward base)
+        if (bestX == -1) {
+            vel.dx = 0;
+            vel.dz = 2.0f; // Move downhill slowly
             return false;
         }
         
