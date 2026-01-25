@@ -6,18 +6,11 @@ package com.project.tycoon.world.model;
  */
 public class Tile {
 
-    public enum TrailDifficulty {
-        GREEN, // Beginner (base)
-        BLUE, // Intermediate (mid-mountain)
-        BLACK, // Advanced (high)
-        DOUBLE_BLACK // Expert (peak)
-    }
-
     private TerrainType type;
     private Decoration decoration = Decoration.NONE;
     private int height; // Elevation level
     private boolean isTrail = false;
-    private TrailDifficulty difficulty = TrailDifficulty.GREEN; // Auto-assigned for trails
+    private TrailDifficulty trailDifficulty = TrailDifficulty.GREEN; // Set by trail builder
 
     public Tile(TerrainType type, int height) {
         this.type = type;
@@ -30,30 +23,14 @@ public class Tile {
 
     public void setTrail(boolean trail) {
         isTrail = trail;
-
-        // Auto-calculate difficulty when tile becomes a trail
-        if (trail) {
-            this.difficulty = calculateDifficulty();
-        }
     }
 
-    /**
-     * Auto-calculate trail difficulty based on elevation.
-     */
-    private TrailDifficulty calculateDifficulty() {
-        if (height < 25) {
-            return TrailDifficulty.GREEN; // Bottom 25% = Green
-        } else if (height < 50) {
-            return TrailDifficulty.BLUE; // 25-50% = Blue
-        } else if (height < 75) {
-            return TrailDifficulty.BLACK; // 50-75% = Black
-        } else {
-            return TrailDifficulty.DOUBLE_BLACK; // Top 25% = Double Black
-        }
+    public TrailDifficulty getTrailDifficulty() {
+        return trailDifficulty;
     }
 
-    public TrailDifficulty getDifficulty() {
-        return difficulty;
+    public void setTrailDifficulty(TrailDifficulty difficulty) {
+        this.trailDifficulty = difficulty;
     }
 
     public TerrainType getType() {

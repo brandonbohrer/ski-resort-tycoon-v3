@@ -4,6 +4,7 @@ import com.project.tycoon.ecs.Engine;
 import com.project.tycoon.ecs.Entity;
 import com.project.tycoon.ecs.System;
 import com.project.tycoon.ecs.components.SkierComponent;
+import com.project.tycoon.ecs.components.SkillLevel;
 import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.ecs.components.VelocityComponent;
 import com.project.tycoon.simulation.VisitorManager;
@@ -36,7 +37,7 @@ public class SkierSpawnerSystem implements System {
         this.engine = engine;
         this.worldMap = worldMap;
     }
-    
+
     /**
      * Set the visitor manager (called by TycoonSimulation after construction).
      */
@@ -113,8 +114,8 @@ public class SkierSpawnerSystem implements System {
 
         SkierComponent skierComp = new SkierComponent();
         skierComp.state = SkierComponent.State.WAITING;
-        skierComp.skillLevel = 0.3f + rand.nextFloat() * 0.7f; // Random skill 0.3-1.0
-        skierComp.stamina = 0.5f + rand.nextFloat() * 0.5f; // Random stamina 0.5-1.0
+        skierComp.skillLevel = SkillLevel.randomSkill(rand); // Use realistic distribution
+        skierComp.satisfaction = 50.0f; // Start neutral
         engine.addComponent(skier, skierComp);
     }
 }

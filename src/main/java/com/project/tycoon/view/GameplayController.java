@@ -12,6 +12,8 @@ import com.project.tycoon.economy.EconomyManager;
 import com.project.tycoon.simulation.TycoonSimulation;
 import com.project.tycoon.world.model.Tile;
 import com.project.tycoon.world.model.SnapPoint;
+import com.project.tycoon.world.model.TrailDifficulty;
+import com.project.tycoon.world.TrailDifficultyCalculator;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
 import com.project.tycoon.view.ui.TrailConfirmDialog;
 
@@ -286,18 +288,37 @@ public class GameplayController extends InputAdapter {
 
     private void showTrailConfirmationDialog() {
         float cost = calculateTrailCost();
+        TrailDifficulty difficulty = calculateCurrentTrailDifficulty();
         trailBuildState = TrailBuildState.CONFIRMATION_DIALOG;
 
-        // Show UI dialog instead of console output
+        // Show UI dialog with calculated difficulty
         if (trailConfirmDialog != null) {
             String startType = trailStartSnapPoint != null ? trailStartSnapPoint.getType().toString() : "Unknown";
             String endType = proposedEndSnapPoint != null ? proposedEndSnapPoint.getType().toString() : "Unknown";
-            trailConfirmDialog.show(pendingTrailTiles.size(), cost, startType, endType);
+            trailConfirmDialog.show(pendingTrailTiles.size(), cost, startType, endType, difficulty);
         }
     }
 
     private float calculateTrailCost() {
         return pendingTrailTiles.size() * 5.0f; // $5 per tile (very cheap!)
+    }
+
+    /**
+     * Calculate current trail difficulty while painting.
+     * Used for real-time visual feedback and confirmation dialog.
+     */
+    private TrailDifficulty calculateCurrentTrailDifficulty() {
+        if (pendingTrailTiles.isEmpty()) {
+            return TrailDifficulty.GREEN;
+        }
+        return TrailDifficultyCalculator.calculate(simulation.getWorldMap(), pendingTrailTiles);
+    }
+
+    /**
+     * Get current trail difficulty (for real-time UI updates).
+     */
+    public TrailDifficulty getPendingTrailDifficulty() {
+        return calculateCurrentTrailDifficulty();
     }
 
     public void confirmTrail() {

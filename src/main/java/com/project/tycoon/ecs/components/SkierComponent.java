@@ -1,6 +1,7 @@
 package com.project.tycoon.ecs.components;
 
 import com.project.tycoon.ecs.Component;
+import com.project.tycoon.world.model.TrailDifficulty;
 import java.util.UUID;
 
 public class SkierComponent implements Component {
@@ -13,16 +14,18 @@ public class SkierComponent implements Component {
     }
 
     public State state;
-    public float skillLevel; // 0.0 to 1.0 (Affects max speed / turning)
+    public SkillLevel skillLevel; // Beginner, Intermediate, Advanced, Expert
     public UUID targetLiftId; // Which lift to ride
     public int queuePosition; // Position in lift queue
-    public float stamina; // Affects when they want to stop (0-1)
+    public float satisfaction; // 0-100 scale, determines if skier leaves early
+    public TrailDifficulty targetTrailDifficulty; // What difficulty they're seeking this run
 
     public SkierComponent() {
         this.state = State.WAITING;
-        this.skillLevel = 0.5f;
+        this.skillLevel = SkillLevel.INTERMEDIATE; // Default, overridden at spawn
         this.targetLiftId = null;
         this.queuePosition = -1;
-        this.stamina = 1.0f;
+        this.satisfaction = 50.0f; // Start neutral
+        this.targetTrailDifficulty = null; // Chosen when looking for trails
     }
 }

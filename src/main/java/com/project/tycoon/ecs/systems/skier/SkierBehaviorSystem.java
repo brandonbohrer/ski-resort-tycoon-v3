@@ -7,7 +7,10 @@ import com.project.tycoon.ecs.components.SkierComponent;
 import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.ecs.components.VelocityComponent;
 import com.project.tycoon.world.model.Tile;
+import com.project.tycoon.world.model.TrailDifficulty;
 import com.project.tycoon.world.model.WorldMap;
+
+import java.util.Random;
 
 /**
  * Applies Skiing logic (Gravity on slopes).
@@ -86,7 +89,17 @@ public class SkierBehaviorSystem implements System {
             return;
         }
 
+        // Choose target difficulty if not already chosen
+        if (skier.targetTrailDifficulty == null) {
+            skier.targetTrailDifficulty = chooseTrailDifficulty(skier);
+        }
+
         if (current.isTrail()) {
+            // Check if current trail matches preference
+            TrailDifficulty currentDifficulty = current.getTrailDifficulty();
+            updateSatisfaction(skier, currentDifficulty);
+
+            // Continue down current trail
             TrailStep next = getFlowStep(x, z, current.getHeight());
             if (next != null) {
                 steerTowardTile(pos, vel, next.x, next.z, skier, next.heightDrop);
@@ -94,7 +107,11 @@ public class SkierBehaviorSystem implements System {
                 steerTowardNearestTrail(pos, vel, skier);
             }
         } else {
-            steerTowardNearestTrail(pos, vel, skier);
+            // Not on trail, seek preferred difficulty
+            if (!seekPreferredTrail(pos, vel, skier)) {
+                // No preferred trail nearby, take any trail
+                steerTowardNearestTrail(pos, vel, skier);
+            }
         }
 
         // Keep skier snapped to terrain height
@@ -395,7 +412,9 @@ public class SkierBehaviorSystem implements System {
             return;
         }
 
-        float desiredSpeed = BASE_SKI_SPEED + (skier.skillLevel * 2.5f) + Math.max(0, heightDrop) * 0.6f;
+        // Convert skill level to numeric value (0-3 maps to different speed bonuses)
+        float skillMultiplier = skier.skillLevel.ordinal() * 0.8f; // 0, 0.8, 1.6, 2.4
+        float desiredSpeed = BASE_SKI_SPEED + skillMultiplier + Math.max(0, heightDrop) * 0.6f;
         desiredSpeed = Math.min(desiredSpeed, MAX_SKI_SPEED);
 
         float desiredDx = (dx / dist) * desiredSpeed;
@@ -438,6 +457,103 @@ public class SkierBehaviorSystem implements System {
             this.x = x;
             this.z = z;
             this.heightDrop = heightDrop;
+        }
+    }
+
+    /**
+     * Choose a trail difficulty based on skier's skill level and preferences.
+     * Uses weighted random selection.
+     */
+    private TrailDifficulty chooseTrailDifficulty(SkierComponent skier) {
+        Random rand = new Random();
+        float r = rand.nextFloat();
+
+        // Use preference weights for weighted random selection
+        float greenWeight = TrailPreferences.getPreference(skier.skillLevel, TrailDifficulty.GREEN);
+        float blueWeight = TrailPreferences.getPreference(skier.skillLevel, TrailDifficulty.BLUE);
+        float blackWeight = TrailPreferences.getPreference(skier.skillLevel, TrailDifficulty.BLACK);
+        float doubleBlackWeight = TrailPreferences.getPreference(skier.skillLevel, TrailDifficulty.DOUBLE_BLACK);
+
+        float total = greenWeight + blueWeight + blackWeight + doubleBlackWeight;
+
+        // Normalize and use cumulative distribution
+        float greenThreshold = greenWeight / total;
+        float blueThreshold = greenThreshold + (blueWeight / total);
+        float blackThreshold = blueThreshold + (blackWeight / total);
+
+        if (r < greenThreshold)
+            return TrailDifficulty.GREEN;
+        if (r < blueThreshold)
+            return TrailDifficulty.BLUE;
+        if (r < blackThreshold)
+            return TrailDifficulty.BLACK;
+        return TrailDifficulty.DOUBLE_BLACK;
+    }
+
+    /**
+     * Seek trails matching the skier's preferred difficulty.
+     * 
+     * @return true if found preferred trail, false otherwise
+     */
+    private boolean seekPreferredTrail(TransformComponent pos, VelocityComponent vel, SkierComponent skier) {
+        int x = (int) Math.floor(pos.x);
+        int z = (int) Math.floor(pos.z);
+
+        int bestX = -1;
+        int bestZ = -1;
+        float bestScore = -1;
+
+        // Search for trails matching preferred difficulty
+        for (int dz = -TRAIL_SEEK_RADIUS; dz <= TRAIL_SEEK_RADIUS; dz++) {
+            for (int dx = -TRAIL_SEEK_RADIUS; dx <= TRAIL_SEEK_RADIUS; dx++) {
+                if (dx == 0 && dz == 0)
+                    continue;
+
+                int nx = x + dx;
+                int nz = z + dz;
+                if (!map.isValid(nx, nz))
+                    continue;
+
+                Tile tile = map.getTile(nx, nz);
+                if (tile == null || !tile.isTrail())
+                    continue;
+
+                // Calculate score based on preference and distance
+                float preference = TrailPreferences.getPreference(skier.skillLevel, tile.getTrailDifficulty());
+                float distSq = dx * dx + dz * dz;
+                float score = preference / (1 + distSq * 0.1f); // Prefer close trails
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestX = nx;
+                    bestZ = nz;
+                }
+            }
+        }
+
+        if (bestX == -1) {
+            return false;
+        }
+
+        steerTowardTileAtSpeed(pos, vel, bestX, bestZ, TRAIL_SEEK_SPEED);
+        return true;
+    }
+
+    /**
+     * Update skier satisfaction based on trail difficulty match.
+     */
+    private void updateSatisfaction(SkierComponent skier, TrailDifficulty trailDifficulty) {
+        // Only update once per trail (simple debounce using a flag would be better)
+        // For now, we'll update continuously but the satisfaction change is clamped
+        float change = TrailPreferences.getSatisfactionChange(skier.skillLevel, trailDifficulty) * 0.01f; // Small
+                                                                                                          // increments
+
+        skier.satisfaction += change;
+        skier.satisfaction = Math.max(0, Math.min(100, skier.satisfaction)); // Clamp 0-100
+
+        // Leave if too unhappy
+        if (skier.satisfaction < 20) {
+            skier.state = SkierComponent.State.FINISHED;
         }
     }
 }

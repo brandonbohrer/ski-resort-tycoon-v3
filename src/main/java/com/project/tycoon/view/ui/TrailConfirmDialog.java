@@ -9,6 +9,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.project.tycoon.world.model.TrailDifficulty;
 
 /**
  * Modal dialog for confirming trail construction.
@@ -35,6 +36,7 @@ public class TrailConfirmDialog {
     private Label lengthLabel;
     private Label costLabel;
     private Label routeLabel;
+    private Label difficultyLabel;
 
     public TrailConfirmDialog(Skin skin) {
         this.skin = skin;
@@ -75,7 +77,11 @@ public class TrailConfirmDialog {
 
         routeLabel = new Label("Route: ... -> ...", skin);
         routeLabel.setColor(Color.DARK_GRAY);
-        mainPanel.add(routeLabel).left().padBottom(20).colspan(2).row();
+        mainPanel.add(routeLabel).left().padBottom(10).colspan(2).row();
+        
+        difficultyLabel = new Label("Difficulty: Green Circle", skin, "title");
+        difficultyLabel.setColor(Color.GREEN);
+        mainPanel.add(difficultyLabel).left().padBottom(20).colspan(2).row();
 
         // Buttons
         TextButton confirmButton = new TextButton("Confirm (ENTER)", skin);
@@ -113,11 +119,15 @@ public class TrailConfirmDialog {
         stage.getRoot().setVisible(false);
     }
 
-    public void show(int tileCount, float cost, String startType, String endType) {
+    public void show(int tileCount, float cost, String startType, String endType, TrailDifficulty difficulty) {
         // Update labels
         lengthLabel.setText("Length: " + tileCount + " tiles");
         costLabel.setText("Cost: $" + String.format("%.0f", cost));
         routeLabel.setText("Route: " + startType + " -> " + endType);
+        
+        // Show difficulty with appropriate color
+        difficultyLabel.setText("Difficulty: " + difficulty.getDisplayName());
+        difficultyLabel.setColor(difficulty.getMarkerColor());
 
         visible = true;
         stage.getRoot().setVisible(true);
