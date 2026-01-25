@@ -24,13 +24,17 @@ public class GameHUD {
     private SpeedControls speedControls;
     private TimeDisplay timeDisplay;
     private FinancesScreen financesScreen;
+    private TrailConfirmDialog trailConfirmDialog;
+    private ModeIndicator modeIndicator;
 
     private final TycoonSimulation simulation;
+    private final GameplayController controller;
 
     public GameHUD(GameplayController controller, EconomyManager economy, TycoonSimulation simulation) {
         this.stage = new Stage(new ScreenViewport());
         this.skin = UIStyleGenerator.generateSkin();
         this.simulation = simulation;
+        this.controller = controller;
 
         buildUI(controller, economy);
     }
@@ -62,6 +66,12 @@ public class GameHUD {
         });
 
         timeDisplay = new TimeDisplay(skin, stage, simulation.getDayTimeSystem());
+
+        // Trail confirmation dialog
+        trailConfirmDialog = new TrailConfirmDialog(skin);
+
+        // Mode indicator
+        modeIndicator = new ModeIndicator(skin, stage);
     }
 
     private void handleCategorySelected(String categoryName) {
@@ -98,20 +108,69 @@ public class GameHUD {
         moneyTicker.setFinancesScreen(financesScreen);
     }
 
+    public TrailConfirmDialog getTrailConfirmDialog() {
+        return trailConfirmDialog;
+    }
+
     public void render(float dt) {
         moneyTicker.update(dt);
         timeDisplay.update(dt);
+
+        // Update mode indicator
+        updateModeIndicator();
+
         stage.act(dt);
         stage.draw();
+
+        // Render trail confirmation dialog (on top of everything)
+        trailConfirmDialog.render(dt);
+    }
+
+    private void updateModeIndicator() {
+        String modeText = "";
+
+        switch (controller.getCurrentMode()) {
+            case BUILD:
+                modeText = "BUILD MODE - Click to place lift";
+                break;
+            case TRAIL:
+                // Show trail-specific state
+                switch (controller.getTrailBuildState()) {
+                    case WAITING_FOR_START:
+                        modeText = "TRAIL MODE - Click snap point to start";
+                        break;
+                    case PAINTING:
+                        int tileCount = controller.getPendingTrailTiles().size();
+                        float cost = tileCount * 5.0f;
+                        modeText = "TRAIL MODE - Painting (" + tileCount + " tiles, $" +
+                                String.format("%.0f", cost) + ") - Right-click to cancel";
+                        break;
+                    case CONFIRMATION_DIALOG:
+                        modeText = "";
+                        break;
+                }
+                break;
+            case TERRAIN:
+                modeText = "TERRAIN MODE - Click to modify terrain";
+                break;
+            case NONE:
+            default:
+                modeText = "";
+                break;
+        }
+
+        modeIndicator.update(modeText);
     }
 
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
+        trailConfirmDialog.resize(width, height);
     }
 
     public void dispose() {
         stage.dispose();
         skin.dispose();
+        trailConfirmDialog.dispose();
     }
 
     public Stage getStage() {

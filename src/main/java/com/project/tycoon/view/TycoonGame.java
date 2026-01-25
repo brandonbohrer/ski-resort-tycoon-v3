@@ -62,16 +62,21 @@ public class TycoonGame extends Game {
                 simulation.getEcsEngine(), simulation);
         gameHUD.setFinancesScreen(financesScreen);
 
+        // Connect trail confirm dialog to gameplay controller
+        gameplayController.setTrailConfirmDialog(gameHUD.getTrailConfirmDialog());
+
         // Multiplexer to handle both camera and gameplay inputs
         com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();
-        multiplexer.addProcessor(financesScreen.getStage()); // Finances screen first (when visible)
-        multiplexer.addProcessor(gameHUD.getStage()); // UI second!
+        multiplexer.addProcessor(gameHUD.getTrailConfirmDialog().getStage()); // Dialog first (when visible)
+        multiplexer.addProcessor(financesScreen.getStage()); // Finances screen second (when visible)
+        multiplexer.addProcessor(gameHUD.getStage()); // UI third!
         multiplexer.addProcessor(gameHUD.getKeyboardProcessor()); // Keyboard shortcuts
-        multiplexer.addProcessor(gameplayController); // Gameplay third
+        multiplexer.addProcessor(gameplayController); // Gameplay fourth
         multiplexer.addProcessor(cameraController); // Camera last
         Gdx.input.setInputProcessor(multiplexer);
 
-        combinedRenderer = new CombinedRenderer(simulation.getWorldMap(), simulation.getEcsEngine(), simulation.getSnapPointManager());
+        combinedRenderer = new CombinedRenderer(simulation.getWorldMap(), simulation.getEcsEngine(),
+                simulation.getSnapPointManager());
     }
 
     @Override
@@ -100,11 +105,11 @@ public class TycoonGame extends Game {
         ScreenUtils.clear(Color.SKY, true);
 
         // Pass gameplay controller to renderer to draw selection cursor
-        boolean isBuildMode = gameplayController.getCurrentMode() == GameplayController.InteractionMode.BUILD
-                || gameplayController.getCurrentMode() == GameplayController.InteractionMode.TRAIL;
+        boolean isBuildMode = gameplayController.getCurrentMode() == GameplayController.InteractionMode.BUILD;
+        boolean isTrailMode = gameplayController.isTrailMode();
         boolean isValidSnapPoint = gameplayController.isValidSnapPointNearby();
-        combinedRenderer.render(camera, gameplayController.getHoveredX(), gameplayController.getHoveredZ(), isBuildMode,
-                isValidSnapPoint, gameplayController.getCurrentPreview());
+        combinedRenderer.render(camera, gameplayController.getHoveredX(), gameplayController.getHoveredZ(),
+                isBuildMode, isTrailMode, isValidSnapPoint, gameplayController.getCurrentPreview());
 
         // 3. Render UI (On top)
         gameHUD.render((float) deltaTime);

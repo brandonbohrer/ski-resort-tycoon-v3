@@ -85,7 +85,12 @@ public class SnapPointManager {
     public List<SnapPoint> getSnapPointsByOwner(UUID ownerId) {
         List<SnapPoint> result = new ArrayList<>();
         for (SnapPoint sp : snapPoints.values()) {
-            if (sp.getOwnerId().equals(ownerId)) {
+            // Handle null ownerIds (e.g., trail snap points)
+            if (ownerId == null) {
+                if (sp.getOwnerId() == null) {
+                    result.add(sp);
+                }
+            } else if (ownerId.equals(sp.getOwnerId())) {
                 result.add(sp);
             }
         }
