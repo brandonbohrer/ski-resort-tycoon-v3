@@ -94,23 +94,13 @@ public class GameplayController extends InputAdapter {
     @Override
     public boolean keyUp(int keycode) {
         if (keycode == Input.Keys.B) {
-            currentMode = InteractionMode.BUILD;
-            isBuildingLift = false;
-            currentPreview = null;
-            System.out.println("Switched to Mode: " + currentMode);
+            setMode(InteractionMode.BUILD);
             return true;
         } else if (keycode == Input.Keys.T) { // Trail Mode
-            currentMode = InteractionMode.TRAIL;
-            isBuildingLift = false;
-            currentPreview = null;
-            resetTrailState(); // Reset trail state when entering mode
-            System.out.println("Switched to Mode: " + currentMode);
+            setMode(InteractionMode.TRAIL);
             return true;
         } else if (keycode == Input.Keys.M) { // Back to Terrain/Move
-            currentMode = InteractionMode.TERRAIN;
-            isBuildingLift = false;
-            currentPreview = null;
-            System.out.println("Switched to Mode: " + currentMode);
+            setMode(InteractionMode.TERRAIN);
             return true;
         } else if (keycode == Input.Keys.ENTER) {
             // Confirm trail
@@ -329,7 +319,8 @@ public class GameplayController extends InputAdapter {
         float cost = calculateTrailCost();
         if (!economy.canAfford(cost)) {
             System.out.println("Cannot afford trail! Cost: $" + cost);
-            cancelTrail();
+            // Full reset to avoid confusion/stuck state
+            resetTrailState();
             return;
         }
 
@@ -452,8 +443,7 @@ public class GameplayController extends InputAdapter {
                 } else if (trailBuildState == TrailBuildState.WAITING_FOR_START) {
                     // Exit trail mode entirely
                     System.out.println("Exiting trail mode");
-                    currentMode = InteractionMode.NONE;
-                    resetTrailState();
+                    setMode(InteractionMode.NONE);
                     return true;
                 }
             }
@@ -588,9 +578,20 @@ public class GameplayController extends InputAdapter {
     }
 
     public void setMode(InteractionMode mode) {
+        // Cleanup previous mode
+        if (this.currentMode == InteractionMode.TRAIL) {
+            resetTrailState();
+        }
+
         this.currentMode = mode;
         this.isBuildingLift = false;
         this.currentPreview = null;
+
+        // Reset state for new mode if needed
+        if (mode == InteractionMode.TRAIL) {
+            resetTrailState();
+        }
+
         System.out.println("Mode set to: " + mode);
     }
 
