@@ -43,7 +43,6 @@ public class LiftPlanner {
         List<LiftCandidate> candidates = findLiftCandidates(currentPos);
         
         if (candidates.isEmpty()) {
-            java.lang.System.out.println("📋 PLANNER: No lift candidates found");
             return null;
         }
         
@@ -53,8 +52,6 @@ public class LiftPlanner {
         
         for (LiftCandidate candidate : candidates) {
             float score = scoreLift(candidate, skier);
-            java.lang.System.out.println("📋 PLANNER: Lift at (" + Math.round(candidate.position.x) + "," + 
-                                         Math.round(candidate.position.z) + ") score=" + score);
             
             if (score > bestScore) {
                 bestScore = score;
@@ -63,9 +60,6 @@ public class LiftPlanner {
         }
         
         if (bestLift != null) {
-            java.lang.System.out.println("🎯 PLANNER: Skier targeting lift at (" + 
-                                         Math.round(bestLift.position.x) + "," + 
-                                         Math.round(bestLift.position.z) + ")");
             return bestLift.liftEntityId;
         }
         

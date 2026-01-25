@@ -89,7 +89,6 @@ public class SkierBehaviorSystem implements System {
 
         // ⭐ FIRST: Check if near target lift (before base check!)
         if (liftDetector.isNearTargetLift(pos, skier.targetLiftId)) {
-            java.lang.System.out.println("🎯 BEHAVIOR: Skier near TARGET lift at (" + Math.round(pos.x) + "," + Math.round(pos.z) + ") → WAITING");
             vel.dx = 0;
             vel.dz = 0;
             skier.state = SkierComponent.State.WAITING;
@@ -102,10 +101,8 @@ public class SkierBehaviorSystem implements System {
             vel.dz = 0;
             
             if (current.isTrail()) {
-                java.lang.System.out.println("🏁 BEHAVIOR: Skier at base on trail → FINISHED");
                 skier.state = SkierComponent.State.FINISHED;
             } else {
-                java.lang.System.out.println("🔄 BEHAVIOR: Skier at base off-trail → WAITING (looking for lift)");
                 skier.state = SkierComponent.State.WAITING;
             }
             return;
@@ -129,8 +126,6 @@ public class SkierBehaviorSystem implements System {
             }
         } else {
             // Off trail: seek back to trails
-            java.lang.System.out.println("⚠️  BEHAVIOR: Skier at (" + Math.round(pos.x) + "," + Math.round(pos.z) + ") off-trail, seeking trail");
-            
             if (!trailSeeker.seekPreferredTrail(pos, vel, skier)) {
                 trailSeeker.seekNearestTrail(pos, vel);
             }

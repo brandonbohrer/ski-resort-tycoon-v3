@@ -148,13 +148,11 @@ public class TrailSeeker {
         
         // LAST RESORT: If still no trail, just move downhill (toward base)
         if (bestX == -1) {
-            java.lang.System.out.println("⚠️  TRAIL SEEKER: No trail found within 30 tiles at (" + Math.round(pos.x) + "," + Math.round(pos.z) + "), moving downhill");
             vel.dx = 0;
             vel.dz = 2.0f; // Move downhill slowly
             return false;
         }
         
-        java.lang.System.out.println("✅ TRAIL SEEKER: Found trail at (" + bestX + "," + bestZ + ") distance=" + Math.sqrt(bestDistSq));
         steerTowardTile(pos, vel, bestX, bestZ);
         return true;
     }

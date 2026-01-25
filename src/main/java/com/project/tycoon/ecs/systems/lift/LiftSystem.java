@@ -66,8 +66,6 @@ public class LiftSystem implements System {
     private void detectAndQueueSkiers() {
         // Find all lift base entities
         Map<UUID, Entity> liftBases = findLiftBases();
-        
-        java.lang.System.out.println("🔍 LIFT: Checking " + liftBases.size() + " lift bases for nearby skiers");
 
         for (Entity skierEntity : engine.getEntities()) {
             if (!engine.hasComponent(skierEntity, SkierComponent.class)) {
@@ -95,7 +93,6 @@ public class LiftSystem implements System {
 
                     // Add to queue if not already in it
                     if (!queue.contains(skierEntity.getId())) {
-                        java.lang.System.out.println("🎫 LIFT: Queueing skier at (" + Math.round(skierPos.x) + "," + Math.round(skierPos.z) + ") → QUEUED");
                         queue.add(skierEntity.getId());
                         skier.state = SkierComponent.State.QUEUED;
                         skier.queuePosition = queue.size() - 1;
@@ -310,12 +307,6 @@ public class LiftSystem implements System {
                 // ⭐ NEW: Plan next lift target based on skill level
                 UUID nextLiftTarget = liftPlanner.chooseNextLift(skier, skierPos);
                 skier.targetLiftId = nextLiftTarget;
-                
-                if (nextLiftTarget != null) {
-                    java.lang.System.out.println("🎯 LIFT: Released skier, targeting specific lift: " + nextLiftTarget);
-                } else {
-                    java.lang.System.out.println("⬇️  LIFT: Released skier, no target lift (will ski to base)");
-                }
             }
         }
     }
