@@ -35,25 +35,78 @@ public class RenderAssetManager {
     private void buildModels() {
         ModelBuilder mb = new ModelBuilder();
 
-        // Skier
-        skierModel = mb.createBox(0.5f, 1.0f, 0.5f,
-                new Material(ColorAttribute.createDiffuse(Color.FIREBRICK)),
-                Usage.Position | Usage.Normal);
+        // Enhanced Skier Model - More humanoid appearance
+        mb.begin();
+        
+        // Legs (dark pants)
+        mb.node().id = "legs";
+        mb.part("legs", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(0.2f, 0.2f, 0.3f, 1f))))
+                .box(0.3f, 0.5f, 0.3f); // Lower half
+        
+        // Torso (colorful ski jacket - bright cyan/teal)
+        mb.node().id = "torso";
+        mb.node().translation.set(0, 0.5f, 0);
+        mb.part("torso", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(0.1f, 0.7f, 0.9f, 1f))))
+                .box(0.4f, 0.6f, 0.35f);
+        
+        // Head (skin tone)
+        mb.node().id = "head";
+        mb.node().translation.set(0, 1.0f, 0);
+        mb.part("head", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(0.95f, 0.8f, 0.7f, 1f))))
+                .sphere(0.25f, 0.25f, 0.25f, 6, 6);
+        
+        // Hat (bright color - red/orange)
+        mb.node().id = "hat";
+        mb.node().translation.set(0, 1.25f, 0);
+        mb.part("hat", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(0.9f, 0.3f, 0.1f, 1f))))
+                .sphere(0.28f, 0.15f, 0.28f, 6, 4);
+        
+        skierModel = mb.end();
 
-        // Lift Pylon
-        liftPylonModel = mb.createBox(0.2f, 3.0f, 0.2f,
-                new Material(ColorAttribute.createDiffuse(Color.GRAY)),
-                Usage.Position | Usage.Normal);
+        // Enhanced Lift Pylon - Industrial metal structure
+        mb.begin();
+        
+        // Main vertical support (metallic silver)
+        mb.node().id = "main_support";
+        mb.part("main_support", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(0.7f, 0.75f, 0.8f, 1f))))
+                .cylinder(0.15f, 3.0f, 0.15f, 8);
+        
+        // Cross-bracing (darker metal)
+        mb.node().id = "brace1";
+        mb.node().translation.set(0, 1.0f, 0);
+        mb.part("brace1", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(0.5f, 0.55f, 0.6f, 1f))))
+                .box(0.4f, 0.08f, 0.08f);
+        
+        mb.node().id = "brace2";
+        mb.node().translation.set(0, 2.0f, 0);
+        mb.part("brace2", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(0.5f, 0.55f, 0.6f, 1f))))
+                .box(0.08f, 0.08f, 0.4f);
+        
+        // Top platform (yellow safety marking)
+        mb.node().id = "platform";
+        mb.node().translation.set(0, 2.8f, 0);
+        mb.part("platform", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(0.9f, 0.9f, 0.1f, 1f))))
+                .cylinder(0.25f, 0.15f, 0.25f, 8);
+        
+        liftPylonModel = mb.end();
 
-        // Cable: Box along Z axis
+        // Enhanced Cable - Thicker, more visible
         mb.begin();
         mb.node().id = "cable";
         mb.part("cable", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
                 new Material(
-                        ColorAttribute.createDiffuse(Color.BLACK),
+                        ColorAttribute.createDiffuse(new Color(0.15f, 0.15f, 0.15f, 1f)), // Dark gray instead of pure black
                         new IntAttribute(IntAttribute.CullFace, 0) // Disable culling
                 ))
-                .box(0.1f, 0.1f, 1.0f);
+                .cylinder(0.06f, 1.0f, 0.06f, 6); // Cylindrical cable instead of box
         cableModel = mb.end();
 
         // Cursor

@@ -71,7 +71,9 @@ public class EntityRenderer {
                     }
 
                 } else if (ecsEngine.hasComponent(entity, SkierComponent.class)) {
-                    renderModelAt(batch, environment, assets.skierModel, drawX, drawY, drawZ, Color.WHITE);
+                    // Add variety to skier jacket colors
+                    Color skierColor = getSkierColor(entity.getId());
+                    renderModelAt(batch, environment, assets.skierModel, drawX, drawY, drawZ, skierColor);
 
                 } else if (ecsEngine.hasComponent(entity, BaseCampComponent.class)) {
                     // Offset +3 units so building sits on terrain instead of sinking
@@ -164,27 +166,53 @@ public class EntityRenderer {
         ModelInstance cable = new ModelInstance(assets.cableModel);
         cable.transform.setToTranslation(mid);
 
+        // For cylinder: rotate from Y-axis (cylinder default) to direction vector
         Vector3 dirNorm = direction.cpy().nor();
-        Vector3 axis = new Vector3(Vector3.Z).crs(dirNorm).nor();
-        float dot = Vector3.Z.dot(dirNorm);
-        float angle = (float) Math.toDegrees(Math.acos(dot));
+        Vector3 cylinderAxis = Vector3.Y.cpy(); // Cylinders are built along Y axis
+        Vector3 rotationAxis = cylinderAxis.crs(dirNorm).nor();
+        float dot = cylinderAxis.dot(dirNorm);
+        float angle = (float) Math.toDegrees(Math.acos(Math.max(-1f, Math.min(1f, dot))));
 
-        if (axis.len2() < 0.001f) {
-            if (dot < 0)
+        if (rotationAxis.len2() < 0.001f) {
+            // Parallel or anti-parallel
+            if (dot < 0) {
                 cable.transform.rotate(Vector3.X, 180);
+            }
         } else {
-            cable.transform.rotate(axis, angle);
+            cable.transform.rotate(rotationAxis, angle);
         }
 
-        cable.transform.scale(1f, 1f, length);
+        cable.transform.scale(1f, length, 1f); // Scale along Y for cylinder
 
         batch.render(cable, env);
 
-        // Chair
+        // Chair (simplified - using skier model as chair)
         ModelInstance chair = new ModelInstance(assets.skierModel);
-        chair.transform.setToTranslation(mid.x, mid.y - 0.5f, mid.z);
-        chair.transform.scale(0.8f, 0.8f, 0.8f);
+        chair.transform.setToTranslation(mid.x, mid.y - 0.8f, mid.z); // Lower position
+        chair.transform.scale(0.6f, 0.6f, 0.6f); // Smaller for chair representation
         batch.render(chair, env);
+    }
+
+    /**
+     * Generate a varied jacket color for each skier based on their ID.
+     * Creates vibrant, visible colors for better visual variety.
+     */
+    private Color getSkierColor(UUID skierId) {
+        // Use hash code for deterministic but varied colors
+        int hash = skierId.hashCode();
+        int colorIndex = Math.abs(hash % 8);
+        
+        switch (colorIndex) {
+            case 0: return new Color(0.1f, 0.7f, 0.9f, 1f);  // Cyan
+            case 1: return new Color(0.9f, 0.3f, 0.1f, 1f);  // Orange
+            case 2: return new Color(0.9f, 0.1f, 0.5f, 1f);  // Pink/Magenta
+            case 3: return new Color(0.2f, 0.9f, 0.3f, 1f);  // Bright Green
+            case 4: return new Color(0.9f, 0.9f, 0.1f, 1f);  // Yellow
+            case 5: return new Color(0.5f, 0.2f, 0.9f, 1f);  // Purple
+            case 6: return new Color(0.1f, 0.5f, 0.9f, 1f);  // Blue
+            case 7: return new Color(0.9f, 0.5f, 0.1f, 1f);  // Bright Orange
+            default: return new Color(0.1f, 0.7f, 0.9f, 1f); // Default Cyan
+        }
     }
 
     private void renderModelAt(ModelBatch batch, Environment env, Model model, float x, float y, float z, Color tint) {
