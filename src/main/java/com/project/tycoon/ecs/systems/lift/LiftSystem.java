@@ -294,9 +294,9 @@ public class LiftSystem implements System {
                     
                     // Fallback: if no trail found, use old position
                     if (!foundTrail) {
-                        skierPos.x = topPos.x + 2;
-                        skierPos.y = topPos.y;
-                        skierPos.z = topPos.z + 2;
+                    skierPos.x = topPos.x + 2;
+                    skierPos.y = topPos.y;
+                    skierPos.z = topPos.z + 2;
                         java.lang.System.out.println("⚠️  LIFT RELEASE: No trail found near lift top, using default position");
                     }
                 }

@@ -20,7 +20,7 @@ public class SkierBehaviorSystem implements System {
 
     private final Engine engine;
     private final WorldMap map;
-    
+
     // Specialized components
     private final TrailFlowFieldCalculator flowField;
     private final TrailScanner trailScanner;
@@ -57,7 +57,7 @@ public class SkierBehaviorSystem implements System {
 
                 if (skier.state == SkierComponent.State.SKIING) {
                     handleSkiingState(skier, pos, vel, dt);
-                    
+
                     // Check if reached bottom
                     if (pos.z >= SkierSpawnerSystem.BASE_Z - 2) {
                         vel.dx = 0;
@@ -101,7 +101,7 @@ public class SkierBehaviorSystem implements System {
             vel.dz = 0;
             
             if (current.isTrail()) {
-                skier.state = SkierComponent.State.FINISHED;
+            skier.state = SkierComponent.State.FINISHED;
             } else {
                 skier.state = SkierComponent.State.WAITING;
             }
@@ -117,7 +117,7 @@ public class SkierBehaviorSystem implements System {
             // On trail: update satisfaction and apply carving
             TrailDifficulty currentDifficulty = current.getTrailDifficulty();
             updateSatisfaction(skier, currentDifficulty, dt);
-            
+
             // ⭐ NEW: Steer toward target lift while skiing
             if (skier.targetLiftId != null) {
                 steerTowardTargetLift(skier, pos, vel, dt);
@@ -134,7 +134,7 @@ public class SkierBehaviorSystem implements System {
         // Keep skier snapped to terrain height
         pos.y = current.getHeight();
     }
-    
+
     /**
      * Steer skier toward their target lift while skiing down.
      */
@@ -153,23 +153,23 @@ public class SkierBehaviorSystem implements System {
             carvingPhysics.applyCarving(skier, pos, vel, dt);
             return;
         }
-        
+
         TransformComponent liftPos = engine.getComponent(targetLift, TransformComponent.class);
         if (liftPos == null) {
             carvingPhysics.applyCarving(skier, pos, vel, dt);
             return;
         }
-        
+
         // Calculate direction to target lift
         float dx = liftPos.x - pos.x;
         float dz = liftPos.z - pos.z;
         float distance = (float) Math.sqrt(dx * dx + dz * dz);
-        
+
         if (distance < 0.1f) {
             carvingPhysics.applyCarving(skier, pos, vel, dt);
             return;
         }
-        
+
         // Normalize direction
         float targetDx = dx / distance;
         float targetDz = dz / distance;
