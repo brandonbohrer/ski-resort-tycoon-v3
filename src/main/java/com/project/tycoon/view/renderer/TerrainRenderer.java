@@ -25,6 +25,9 @@ public class TerrainRenderer {
 
     private final WorldMap worldMap;
     private final RenderAssetManager assets;
+    
+    // Cached max height for elevation-based coloring
+    private float maxHeight = 100f; // Default, recalculated when terrain is rebuilt
 
     private Model terrainModel;
     private ModelInstance terrainInstance;
@@ -160,7 +163,27 @@ public class TerrainRenderer {
         trailMarkerInstances.add(marker);
     }
 
+    /**
+     * Calculate the maximum height in the world for elevation-based coloring.
+     */
+    private void calculateMaxHeight() {
+        float max = 0f;
+        for (int z = 0; z < worldMap.getDepth(); z++) {
+            for (int x = 0; x < worldMap.getWidth(); x++) {
+                Tile t = worldMap.getTile(x, z);
+                if (t != null && t.getHeight() > max) {
+                    max = t.getHeight();
+                }
+            }
+        }
+        // Ensure we don't divide by zero
+        maxHeight = max > 0 ? max : 100f;
+    }
+
     private void buildTerrainModel() {
+        // Calculate max height for elevation-based coloring
+        calculateMaxHeight();
+        
         ModelBuilder mb = new ModelBuilder();
         mb.begin();
 
@@ -222,21 +245,69 @@ public class TerrainRenderer {
         terrainInstance = new ModelInstance(terrainModel);
     }
 
+    /**
+     * Enhanced terrain coloring with elevation-based shading and trail difficulty colors.
+     */
     private Color getTerrainColor(Tile tile) {
+        // Trail colors based on difficulty
         if (tile.isTrail()) {
-            return Color.WHITE;
+            return getTrailColor(tile);
         }
+        
+        // Elevation-based shading for non-trail terrain
+        float elevation = tile.getHeight();
+        float elevationFactor = Math.min(1.0f, elevation / maxHeight);
+        
+        Color baseColor;
         switch (tile.getType()) {
             case SNOW:
-                return new Color(0.9f, 0.95f, 1.0f, 1f);
+                // Brighter snow at higher elevations, slightly blue-tinted
+                float snowBrightness = 0.80f + (elevationFactor * 0.15f); // 0.80 -> 0.95
+                baseColor = new Color(snowBrightness, snowBrightness + 0.03f, snowBrightness + 0.08f, 1f);
+                break;
             case GRASS:
-                return new Color(0.2f, 0.6f, 0.1f, 1f);
+                // Darker grass in valleys, lighter on hills
+                float grassGreen = 0.50f + (elevationFactor * 0.15f);
+                baseColor = new Color(0.15f, grassGreen, 0.08f, 1f);
+                break;
             case ROCK:
-                return Color.GRAY;
+                // Rocky areas with slight elevation variation
+                float rockBrightness = 0.45f + (elevationFactor * 0.10f);
+                baseColor = new Color(rockBrightness, rockBrightness * 0.95f, rockBrightness * 0.90f, 1f);
+                break;
             case DIRT:
-                return new Color(0.5f, 0.3f, 0.1f, 1f);
+                // Brownish dirt
+                float dirtBrightness = 0.40f + (elevationFactor * 0.10f);
+                baseColor = new Color(dirtBrightness, dirtBrightness * 0.65f, dirtBrightness * 0.25f, 1f);
+                break;
             default:
-                return Color.WHITE;
+                baseColor = new Color(0.9f, 0.9f, 0.95f, 1f);
+                break;
+        }
+        
+        return baseColor;
+    }
+    
+    /**
+     * Get distinct trail color based on difficulty rating.
+     * Makes trails highly visible and easy to distinguish.
+     */
+    private Color getTrailColor(Tile tile) {
+        switch (tile.getTrailDifficulty()) {
+            case GREEN:
+                // Bright, groomed green trail
+                return new Color(0.85f, 0.95f, 0.85f, 1f);
+            case BLUE:
+                // Icy blue trail
+                return new Color(0.80f, 0.88f, 0.98f, 1f);
+            case BLACK:
+                // Packed, darker trail
+                return new Color(0.75f, 0.78f, 0.80f, 1f);
+            case DOUBLE_BLACK:
+                // High-contrast expert trail
+                return new Color(0.70f, 0.72f, 0.75f, 1f);
+            default:
+                return new Color(0.95f, 0.95f, 0.98f, 1f); // Default bright snow
         }
     }
 
