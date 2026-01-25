@@ -129,10 +129,16 @@ public class EntityRenderer {
                         snapColor = new Color(1.0f, 0.5f, 0.0f, 0.8f); // Orange
                         break;
                     case TRAIL_START:
-                        snapColor = new Color(0.0f, 1.0f, 0.0f, 0.8f); // Green
-                        break;
                     case TRAIL_END:
-                        snapColor = new Color(0.8f, 0.0f, 1.0f, 0.8f); // Purple
+                        // Color based on trail difficulty at this location
+                        if (t != null && t.isTrail()) {
+                            Color difficultyColor = t.getTrailDifficulty().getMarkerColor();
+                            // Make it semi-transparent
+                            snapColor = new Color(difficultyColor.r, difficultyColor.g, difficultyColor.b, 0.8f);
+                        } else {
+                            // Default if not on trail (shouldn't happen)
+                            snapColor = new Color(0.8f, 0.8f, 0.8f, 0.8f); // Gray
+                        }
                         break;
                     default:
                         snapColor = new Color(1.0f, 1.0f, 1.0f, 0.8f); // White
