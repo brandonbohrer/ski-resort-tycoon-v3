@@ -25,7 +25,7 @@ public class TerrainGenerator {
         // Mountain parameters (randomized per seed)
         float peakOffsetX = random.nextFloat() * 0.4f - 0.2f; // -20% to +20%
         float peakHeight = 60.0f + random.nextFloat() * 40.0f; // 60-100
-        float baseZoneRatio = 0.28f; // Bottom 28% is flat
+        float baseZoneRatio = 0.08f; // Bottom 8% is flat (minimal flat land)
 
         // Generate height map
         for (int z = 0; z < depth; z++) {
@@ -91,39 +91,19 @@ public class TerrainGenerator {
 
     /**
      * Find the flattest area in the base zone for base camp placement.
+     * Places base camp at CENTER-BOTTOM (x=128, z=250) - exactly where skiers
+     * spawn.
      */
     private static BaseCampLocation findBestBaseCampLocation(WorldMap map, float baseZoneRatio) {
         int width = map.getWidth();
         int depth = map.getDepth();
 
-        int bestX = width / 2;
-        int bestZ = (int) (depth * 0.85); // Default: 85% down
-        float bestFlatness = Float.MAX_VALUE;
+        // Place base camp exactly where skiers spawn: x=128 (center), z=250 (bottom)
+        int baseCampX = 128; // Center of 256-wide map
+        int baseCampZ = 250; // Bottom of 256-deep map (skier spawn point)
 
-        // Search area (bottom portion of base zone)
-        int searchZStart = (int) (depth * baseZoneRatio * 0.6); // Start of flat zone
-        int searchZEnd = depth - 15; // Stay away from edge
-
-        int checkRadius = 8; // Check 8x8 area around each point
-
-        for (int z = searchZStart; z < searchZEnd; z += 3) { // Sample every 3rd tile
-            for (int x = 25; x < width - 25; x += 3) { // Stay away from edges
-                float flatness = calculateFlatness(map, x, z, checkRadius);
-
-                // Prefer center-ish locations (slight bias)
-                float centerDist = Math.abs(x - width / 2f) / (width / 2f);
-                float score = flatness * (1.0f + centerDist * 0.2f);
-
-                if (score < bestFlatness) {
-                    bestFlatness = score;
-                    bestX = x;
-                    bestZ = z;
-                }
-            }
-        }
-
-        float height = map.getTile(bestX, bestZ).getHeight();
-        return new BaseCampLocation(bestX, bestZ, height);
+        float height = map.getTile(baseCampX, baseCampZ).getHeight();
+        return new BaseCampLocation(baseCampX, baseCampZ, height);
     }
 
     /**
