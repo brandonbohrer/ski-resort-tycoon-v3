@@ -116,43 +116,45 @@ public class TerrainRenderer {
     /**
      * Creates and caches trail marker instances for borders of a trail tile.
      */
+    /**
+     * Creates and caches trail marker instances for borders of a trail tile.
+     */
     private void cacheTrailMarkersForTile(int x, int z) {
         float h00 = getH(x, z);
         float h10 = getH(x + 1, z);
         float h01 = getH(x, z + 1);
         float h11 = getH(x + 1, z + 1);
 
+        Tile t = worldMap.getTile(x, z);
+        Color markerColor = t.getTrailDifficulty().getMarkerColor();
+
         // North (z-1)
         if (isNotTrail(x, z - 1)) {
-            createTrailMarker(x + 0.5f, (h00 + h10) * 0.5f, z);
+            createTrailMarker(x + 0.5f, (h00 + h10) * 0.5f, z, markerColor);
         }
         // South (z+1)
         if (isNotTrail(x, z + 1)) {
-            createTrailMarker(x + 0.5f, (h01 + h11) * 0.5f, z + 1f);
+            createTrailMarker(x + 0.5f, (h01 + h11) * 0.5f, z + 1f, markerColor);
         }
         // West (x-1)
         if (isNotTrail(x - 1, z)) {
-            createTrailMarker(x, (h00 + h01) * 0.5f, z + 0.5f);
+            createTrailMarker(x, (h00 + h01) * 0.5f, z + 0.5f, markerColor);
         }
         // East (x+1)
         if (isNotTrail(x + 1, z)) {
-            createTrailMarker(x + 1f, (h10 + h11) * 0.5f, z + 0.5f);
+            createTrailMarker(x + 1f, (h10 + h11) * 0.5f, z + 0.5f, markerColor);
         }
     }
 
     /**
      * Creates a single trail marker instance and adds it to the cache.
      */
-    private void createTrailMarker(float x, float y, float z) {
+    private void createTrailMarker(float x, float y, float z, Color color) {
         ModelInstance marker = new ModelInstance(assets.trailMarkerModel);
         marker.transform.setToTranslation(x, y + 0.25f, z);
 
-        // Alternating Color based on position
-        boolean isOrange = ((int) (x + z)) % 2 == 0;
-        Color c = isOrange ? Color.ORANGE : Color.BLACK;
-
         for (Material m : marker.materials) {
-            m.set(ColorAttribute.createDiffuse(c));
+            m.set(ColorAttribute.createDiffuse(color));
         }
 
         trailMarkerInstances.add(marker);

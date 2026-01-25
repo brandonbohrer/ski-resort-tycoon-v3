@@ -397,6 +397,16 @@ public class GameplayController extends InputAdapter {
 
         System.out.println("Trail created from " + trailStartSnapPoint.getType() +
                 " to " + proposedEndSnapPoint.getType());
+
+        // Save trail difficulty to tiles
+        TrailDifficulty difficulty = calculateCurrentTrailDifficulty();
+        for (Vector2 tilePos : pendingTrailTiles) {
+            Tile t = simulation.getWorldMap().getTile((int) tilePos.x, (int) tilePos.y);
+            if (t != null) {
+                t.setTrailDifficulty(difficulty);
+                simulation.getWorldMap().setTile((int) tilePos.x, (int) tilePos.y, t);
+            }
+        }
     }
 
     private void resetTrailState() {
