@@ -530,6 +530,16 @@ public class GameplayController extends InputAdapter {
                                 SnapPoint.SnapPointType.LIFT_BOTTOM,
                                 firstPylon.getId());
                         simulation.getSnapPointManager().registerSnapPoint(liftBottom);
+                        
+                        // Connect lift bottom to BASE_CAMP (so skiers can path from base to lift)
+                        List<SnapPoint> baseCamps = simulation.getSnapPointManager()
+                                .getSnapPointsByType(SnapPoint.SnapPointType.BASE_CAMP);
+                        if (!baseCamps.isEmpty()) {
+                            simulation.getSnapPointManager().connectSnapPoints(
+                                    baseCamps.get(0).getId(), 
+                                    liftBottom.getId());
+                            System.out.println("Connected LIFT_BOTTOM to BASE_CAMP");
+                        }
                     }
 
                     if (lastPylon != null && lastPylon != firstPylon) {

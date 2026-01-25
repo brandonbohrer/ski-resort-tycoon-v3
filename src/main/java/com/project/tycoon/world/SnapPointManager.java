@@ -3,6 +3,8 @@ package com.project.tycoon.world;
 import com.project.tycoon.world.model.SnapPoint;
 
 import java.util.*;
+import java.util.Queue;
+import java.util.LinkedList;
 
 /**
  * Manages all snap points in the world and their connections.
@@ -148,25 +150,75 @@ public class SnapPointManager {
     }
 
     /**
-     * Simple pathfinding: find a path between two snap points.
-     * Returns list of snap point IDs representing the path.
-     * For now, just returns direct connection if exists.
+     * Find the shortest path between two snap points using BFS.
+     * Returns list of snap point IDs representing the path (including start and end).
+     * Returns empty list if no path exists.
      */
     public List<UUID> findPath(UUID start, UUID end) {
-        List<UUID> path = new ArrayList<>();
-        SnapPoint startPoint = snapPoints.get(start);
+        if (start == null || end == null) {
+            return new ArrayList<>();
+        }
 
-        if (startPoint == null) {
+        if (start.equals(end)) {
+            List<UUID> path = new ArrayList<>();
+            path.add(start);
             return path;
         }
 
-        // Simple: if directly connected, return path
-        if (startPoint.isConnectedTo(end)) {
-            path.add(start);
-            path.add(end);
+        SnapPoint startPoint = snapPoints.get(start);
+        SnapPoint endPoint = snapPoints.get(end);
+
+        if (startPoint == null || endPoint == null) {
+            return new ArrayList<>();
         }
 
-        // TODO: Implement proper BFS/Dijkstra for multi-hop paths
+        // BFS to find shortest path
+        Map<UUID, UUID> cameFrom = new HashMap<>();
+        Queue<UUID> queue = new LinkedList<>();
+        Set<UUID> visited = new HashSet<>();
+
+        queue.add(start);
+        visited.add(start);
+        cameFrom.put(start, null);
+
+        while (!queue.isEmpty()) {
+            UUID current = queue.poll();
+
+            if (current.equals(end)) {
+                // Found path, reconstruct it
+                return reconstructPath(cameFrom, start, end);
+            }
+
+            SnapPoint currentPoint = snapPoints.get(current);
+            if (currentPoint == null) {
+                continue;
+            }
+
+            // Explore neighbors
+            for (UUID neighbor : currentPoint.getConnections()) {
+                if (!visited.contains(neighbor)) {
+                    visited.add(neighbor);
+                    cameFrom.put(neighbor, current);
+                    queue.add(neighbor);
+                }
+            }
+        }
+
+        // No path found
+        return new ArrayList<>();
+    }
+
+    /**
+     * Reconstruct path from BFS parent map.
+     */
+    private List<UUID> reconstructPath(Map<UUID, UUID> cameFrom, UUID start, UUID end) {
+        List<UUID> path = new ArrayList<>();
+        UUID current = end;
+
+        while (current != null) {
+            path.add(0, current); // Add to front
+            current = cameFrom.get(current);
+        }
 
         return path;
     }

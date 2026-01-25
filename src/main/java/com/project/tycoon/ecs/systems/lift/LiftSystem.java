@@ -27,8 +27,8 @@ public class LiftSystem implements System {
     private final Map<UUID, Float> boardingTimers = new HashMap<>();
     private static final float BOARDING_INTERVAL = 2.0f;
 
-    // Detection radius for lift base
-    private static final float QUEUE_DETECTION_RADIUS = 5.0f;
+    // Detection radius for lift base (must match SkierNavigationSystem's DETECTION_RADIUS)
+    private static final float QUEUE_DETECTION_RADIUS = 8.0f;
 
     public LiftSystem(Engine engine, EconomyManager economy) {
         this.engine = engine;
@@ -59,6 +59,8 @@ public class LiftSystem implements System {
     private void detectAndQueueSkiers() {
         // Find all lift base entities
         Map<UUID, Entity> liftBases = findLiftBases();
+        
+        java.lang.System.out.println("🔍 LIFT: Checking " + liftBases.size() + " lift bases for nearby skiers");
 
         for (Entity skierEntity : engine.getEntities()) {
             if (!engine.hasComponent(skierEntity, SkierComponent.class)) {
@@ -86,6 +88,7 @@ public class LiftSystem implements System {
 
                     // Add to queue if not already in it
                     if (!queue.contains(skierEntity.getId())) {
+                        java.lang.System.out.println("🎫 LIFT: Queueing skier at (" + Math.round(skierPos.x) + "," + Math.round(skierPos.z) + ") → QUEUED");
                         queue.add(skierEntity.getId());
                         skier.state = SkierComponent.State.QUEUED;
                         skier.queuePosition = queue.size() - 1;

@@ -49,9 +49,8 @@ public class SkierBehaviorSystem implements System {
                 VelocityComponent vel = engine.getComponent(entity, VelocityComponent.class);
 
                 // Handle different states
-                if (skier.state == SkierComponent.State.WAITING) {
-                    handleWaitingState(skier, pos, vel);
-                } else if (skier.state == SkierComponent.State.SKIING) {
+                // NOTE: WAITING state now handled by SkierNavigationSystem
+                if (skier.state == SkierComponent.State.SKIING) {
                     handleSkiingState(skier, pos, vel, dt);
 
                     // Check if reached bottom (finish line)
@@ -65,6 +64,7 @@ public class SkierBehaviorSystem implements System {
                     vel.dz = 0;
                 }
                 // QUEUED and RIDING_LIFT states are handled by LiftSystem
+                // WAITING state is handled by SkierNavigationSystem
             }
         }
     }
@@ -82,10 +82,28 @@ public class SkierBehaviorSystem implements System {
             return;
         }
 
+        // Check if reached base area (near spawn zone)
         if (z >= SkierSpawnerSystem.BASE_Z - 2) {
             vel.dx = 0;
             vel.dz = 0;
-            skier.state = SkierComponent.State.FINISHED;
+            // If on trail at base, finish. If not on trail, look for lift.
+            if (current.isTrail()) {
+                java.lang.System.out.println("🏁 BEHAVIOR: Skier at base on trail → FINISHED");
+                skier.state = SkierComponent.State.FINISHED;
+            } else {
+                java.lang.System.out.println("🔄 BEHAVIOR: Skier at base off-trail → WAITING (looking for lift)");
+                skier.state = SkierComponent.State.WAITING;
+            }
+            return;
+        }
+
+        // Check if near a lift base (anywhere on mountain)
+        // This allows skiers to board mid-mountain lifts
+        if (isNearLiftBase(pos)) {
+            java.lang.System.out.println("🛑 BEHAVIOR: Skier near lift at (" + Math.round(pos.x) + "," + Math.round(pos.z) + ") → WAITING");
+            vel.dx = 0;
+            vel.dz = 0;
+            skier.state = SkierComponent.State.WAITING;
             return;
         }
 
@@ -102,6 +120,7 @@ public class SkierBehaviorSystem implements System {
             // REALISTIC SKIING: Use carving system instead of simple flow
             handleCarvingSkiing(skier, pos, vel, dt);
         } else {
+            java.lang.System.out.println("⚠️  BEHAVIOR: Skier at (" + Math.round(pos.x) + "," + Math.round(pos.z) + ") off-trail, seeking trail");
             // Not on trail, seek preferred difficulty
             if (!seekPreferredTrail(pos, vel, skier)) {
                 // No preferred trail nearby, take any trail
@@ -267,92 +286,8 @@ public class SkierBehaviorSystem implements System {
     }
 
     /**
-     * Handle WAITING state - find and move toward nearest lift.
+     * Steer toward the nearest trail tile (used when skier goes off trail).
      */
-    private void handleWaitingState(SkierComponent skier, TransformComponent pos, VelocityComponent vel) {
-        // Find nearest lift base
-        Entity nearestLift = findNearestLiftBase(pos);
-
-        if (nearestLift != null) {
-            skier.targetLiftId = nearestLift.getId();
-            moveTowardLift(pos, vel, nearestLift);
-        } else {
-            // No lift found, stop moving
-            vel.dx = 0;
-            vel.dz = 0;
-        }
-    }
-
-    /**
-     * Find the nearest lift base to the skier.
-     */
-    private Entity findNearestLiftBase(TransformComponent skierPos) {
-        Entity nearest = null;
-        float minDistance = Float.MAX_VALUE;
-
-        // Find all lift base entities (pylons with no incoming links)
-        java.util.Set<java.util.UUID> hasIncoming = new java.util.HashSet<>();
-
-        // First pass: identify all pylons that are pointed to
-        for (Entity entity : engine.getEntities()) {
-            if (engine.hasComponent(entity, com.project.tycoon.ecs.components.LiftComponent.class)) {
-                com.project.tycoon.ecs.components.LiftComponent lift = engine.getComponent(entity,
-                        com.project.tycoon.ecs.components.LiftComponent.class);
-                if (lift.nextPylonId != null) {
-                    hasIncoming.add(lift.nextPylonId);
-                }
-            }
-        }
-
-        // Second pass: find nearest base (pylon with no incoming link)
-        for (Entity entity : engine.getEntities()) {
-            if (engine.hasComponent(entity, com.project.tycoon.ecs.components.LiftComponent.class) &&
-                    !hasIncoming.contains(entity.getId())) {
-
-                TransformComponent liftPos = engine.getComponent(entity, TransformComponent.class);
-                if (liftPos == null)
-                    continue;
-
-                float dx = liftPos.x - skierPos.x;
-                float dz = liftPos.z - skierPos.z;
-                float distance = (float) Math.sqrt(dx * dx + dz * dz);
-
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    nearest = entity;
-                }
-            }
-        }
-
-        return nearest;
-    }
-
-    /**
-     * Move skier toward the target lift.
-     */
-    private void moveTowardLift(TransformComponent pos, VelocityComponent vel, Entity liftEntity) {
-        TransformComponent liftPos = engine.getComponent(liftEntity, TransformComponent.class);
-        if (liftPos == null)
-            return;
-
-        // Calculate direction to lift
-        float dx = liftPos.x - pos.x;
-        float dz = liftPos.z - pos.z;
-        float distance = (float) Math.sqrt(dx * dx + dz * dz);
-
-        // If already close enough, stop moving
-        if (distance < 2.0f) {
-            vel.dx = 0;
-            vel.dz = 0;
-            return;
-        }
-
-        // Move toward lift at constant speed
-        float speed = 3.0f;
-        vel.dx = (dx / distance) * speed;
-        vel.dz = (dz / distance) * speed;
-    }
-
     private boolean steerTowardNearestTrail(TransformComponent pos, VelocityComponent vel, SkierComponent skier) {
         int x = (int) Math.floor(pos.x);
         int z = (int) Math.floor(pos.z);
@@ -656,5 +591,46 @@ public class SkierBehaviorSystem implements System {
             this.rightEdge = right;
             this.onTrail = onTrail;
         }
+    }
+    
+    /**
+     * Check if skier is near any lift base (to allow boarding mid-mountain lifts).
+     */
+    private boolean isNearLiftBase(TransformComponent skierPos) {
+        final float LIFT_DETECTION_RADIUS = 8.0f; // tiles
+        
+        // Find all lift base entities (pylons with no incoming links)
+        java.util.Set<java.util.UUID> hasIncoming = new java.util.HashSet<>();
+        
+        // First pass: identify all pylons that are pointed to
+        for (Entity entity : engine.getEntities()) {
+            if (engine.hasComponent(entity, com.project.tycoon.ecs.components.LiftComponent.class)) {
+                com.project.tycoon.ecs.components.LiftComponent lift = engine.getComponent(entity,
+                        com.project.tycoon.ecs.components.LiftComponent.class);
+                if (lift.nextPylonId != null) {
+                    hasIncoming.add(lift.nextPylonId);
+                }
+            }
+        }
+        
+        // Second pass: check if skier is near any base (pylon with no incoming link)
+        for (Entity entity : engine.getEntities()) {
+            if (engine.hasComponent(entity, com.project.tycoon.ecs.components.LiftComponent.class) &&
+                    !hasIncoming.contains(entity.getId())) {
+                
+                TransformComponent liftPos = engine.getComponent(entity, TransformComponent.class);
+                if (liftPos == null) continue;
+                
+                float dx = liftPos.x - skierPos.x;
+                float dz = liftPos.z - skierPos.z;
+                float distance = (float) Math.sqrt(dx * dx + dz * dz);
+                
+                if (distance < LIFT_DETECTION_RADIUS) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 }
