@@ -52,19 +52,18 @@ public class FinancesScreen {
         Table background = new Table();
         background.setFillParent(true);
         background.setBackground(new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
-                skin.get("dark_gray", com.badlogic.gdx.graphics.Texture.class)));
-        background.getColor().a = 0.8f; // Semi-transparent
+                skin.get("dark_bg", com.badlogic.gdx.graphics.Texture.class)));
         stage.addActor(background);
 
         // Main content panel (centered)
         mainPanel = new Table();
         mainPanel.setBackground(new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
-                skin.get("white", com.badlogic.gdx.graphics.Texture.class)));
+                skin.get("medium_bg", com.badlogic.gdx.graphics.Texture.class)));
         mainPanel.pad(40);
 
         // Header
         Label title = new Label("FINANCIAL REPORT", skin, "title");
-        title.setColor(Color.BLACK);
+        title.setColor(Color.WHITE);
         mainPanel.add(title).colspan(2).center().padBottom(30).row();
 
         // === CURRENT BALANCE SECTION ===
@@ -89,7 +88,7 @@ public class FinancesScreen {
         mainPanel.row().padTop(10);
         Table separator = new Table();
         separator.setBackground(new com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable(
-                skin.get("dark_gray", com.badlogic.gdx.graphics.Texture.class)));
+                skin.get("light_bg", com.badlogic.gdx.graphics.Texture.class)));
         mainPanel.add(separator).colspan(2).height(2).fillX().padBottom(10).row();
         
         netProfitLabel = addValueRow("Net Profit/Loss:", "$0.00", Color.BLACK);
@@ -121,8 +120,7 @@ public class FinancesScreen {
      */
     private void addSectionHeader(String text) {
         Label header = new Label(text, skin);
-        header.setColor(new Color(0.3f, 0.3f, 0.3f, 1f));
-        header.setFontScale(1.2f);
+        header.setColor(new Color(0.7f, 0.8f, 0.95f, 1f)); // Light blue-ish
         mainPanel.add(header).colspan(2).left().padBottom(10).padTop(5).row();
     }
     
@@ -133,7 +131,7 @@ public class FinancesScreen {
     private Label addValueRow(String labelText, String initialValue, Color valueColor) {
         // Label
         Label label = new Label(labelText, skin);
-        label.setColor(Color.BLACK);
+        label.setColor(new Color(0.85f, 0.85f, 0.85f, 1f));
         mainPanel.add(label).left().padRight(20).padBottom(8);
         
         // Value
@@ -163,8 +161,8 @@ public class FinancesScreen {
         netProfitLabel.setText(formatMoney(netProfit));
         
         // Color code the balance and net profit
-        balanceLabel.setColor(balance >= 0 ? Color.BLACK : Color.RED);
-        netProfitLabel.setColor(netProfit >= 0 ? new Color(0.1f, 0.5f, 0.1f, 1f) : new Color(0.7f, 0.1f, 0.1f, 1f));
+        balanceLabel.setColor(balance >= 0 ? Color.WHITE : new Color(1f, 0.3f, 0.3f, 1f));
+        netProfitLabel.setColor(netProfit >= 0 ? new Color(0.3f, 0.9f, 0.5f, 1f) : new Color(1f, 0.3f, 0.3f, 1f));
     }
     
     /**

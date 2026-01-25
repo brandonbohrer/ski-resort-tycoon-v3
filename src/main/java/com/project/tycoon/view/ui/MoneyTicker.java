@@ -44,7 +44,7 @@ public class MoneyTicker {
         tickerTable = new Table();
         tickerTable.setFillParent(true);
         tickerTable.top().right();
-        tickerTable.pad(15);
+        tickerTable.pad(60, 15, 15, 15); // Extra padding at top to sit below time display
 
         // Money label
         moneyLabel = new Label("", skin, "title");
