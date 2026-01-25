@@ -99,13 +99,8 @@ public class SkierBehaviorSystem implements System {
             TrailDifficulty currentDifficulty = current.getTrailDifficulty();
             updateSatisfaction(skier, currentDifficulty);
 
-            // Continue down current trail
-            TrailStep next = getFlowStep(x, z, current.getHeight());
-            if (next != null) {
-                steerTowardTile(pos, vel, next.x, next.z, skier, next.heightDrop);
-            } else {
-                steerTowardNearestTrail(pos, vel, skier);
-            }
+            // REALISTIC SKIING: Use carving system instead of simple flow
+            handleCarvingSkiing(skier, pos, vel, dt);
         } else {
             // Not on trail, seek preferred difficulty
             if (!seekPreferredTrail(pos, vel, skier)) {
@@ -554,6 +549,134 @@ public class SkierBehaviorSystem implements System {
         // Leave if too unhappy
         if (skier.satisfaction < 20) {
             skier.state = SkierComponent.State.FINISHED;
+        }
+    }
+
+    /**
+     * Handle realistic skiing with carving turns.
+     */
+    private void handleCarvingSkiing(SkierComponent skier, TransformComponent pos, VelocityComponent vel, double dt) {
+        // Update carving phase (advance through turn cycle)
+        skier.carvingPhase += (float) dt * skier.carvingSpeed;
+
+        // Calculate current carving direction (sine wave for smooth S-turns)
+        skier.carvingDirection = (float) Math.sin(skier.carvingPhase);
+
+        // Get trail info at current position
+        TrailInfo trailInfo = getTrailInfo(pos.x, pos.z);
+
+        if (!trailInfo.onTrail) {
+            // Lost trail, seek back
+            steerTowardNearestTrail(pos, vel, skier);
+            return;
+        }
+
+        // Get downhill direction from flow field
+        int x = (int) Math.floor(pos.x);
+        int z = (int) Math.floor(pos.z);
+        TrailStep next = getFlowStep(x, z, map.getTile(x, z).getHeight());
+
+        if (next == null) {
+            // No flow, head straight down
+            steerTowardNearestTrail(pos, vel, skier);
+            return;
+        }
+
+        // Calculate lateral offset from centerline based on carving direction
+        float lateralShift = skier.carvingDirection * (trailInfo.trailWidth * 0.35f);
+
+        // Target position combines downhill + lateral movement
+        float targetX = trailInfo.centerlineX + lateralShift;
+        float targetZ = next.z + 0.5f;
+
+        // Keep within trail boundaries
+        targetX = Math.max(trailInfo.leftEdge + 0.5f, Math.min(trailInfo.rightEdge - 0.5f, targetX));
+
+        // Steer toward target
+        float dx = targetX - pos.x;
+        float dz = targetZ - pos.z;
+        float dist = (float) Math.sqrt(dx * dx + dz * dz);
+
+        if (dist < 0.05f)
+            return;
+
+        // Calculate speed based on skill and turn sharpness
+        float turnSharpness = Math.abs(skier.carvingDirection);
+        float speedMultiplier = 1.0f - (turnSharpness * 0.3f); // Slow down 30% in sharp turns
+
+        float skillMultiplier = skier.skillLevel.ordinal() * 0.8f;
+        float baseSpeed = BASE_SKI_SPEED + skillMultiplier;
+        float speed = baseSpeed * speedMultiplier;
+        speed = Math.min(speed, MAX_SKI_SPEED);
+
+        // Apply velocity
+        float desiredDx = (dx / dist) * speed;
+        float desiredDz = (dz / dist) * speed;
+
+        vel.dx = lerp(vel.dx, desiredDx, TURN_LERP);
+        vel.dz = lerp(vel.dz, desiredDz, TURN_LERP);
+    }
+
+    /**
+     * Get trail width and centerline information at a position.
+     */
+    private TrailInfo getTrailInfo(float x, float z) {
+        int ix = (int) x;
+        int iz = (int) z;
+
+        // Scan left to find edge
+        int leftEdge = ix;
+        for (int dx = 0; dx < 20; dx++) {
+            int checkX = ix - dx;
+            if (!map.isValid(checkX, iz))
+                break;
+            Tile t = map.getTile(checkX, iz);
+            if (t == null || !t.isTrail()) {
+                leftEdge = checkX + 1;
+                break;
+            }
+            if (dx == 19)
+                leftEdge = checkX; // Hit scan limit
+        }
+
+        // Scan right to find edge
+        int rightEdge = ix;
+        for (int dx = 0; dx < 20; dx++) {
+            int checkX = ix + dx;
+            if (!map.isValid(checkX, iz))
+                break;
+            Tile t = map.getTile(checkX, iz);
+            if (t == null || !t.isTrail()) {
+                rightEdge = checkX - 1;
+                break;
+            }
+            if (dx == 19)
+                rightEdge = checkX; // Hit scan limit
+        }
+
+        float centerX = (leftEdge + rightEdge) / 2.0f;
+        float width = rightEdge - leftEdge;
+        boolean onTrail = (ix >= leftEdge && ix <= rightEdge);
+
+        return new TrailInfo(centerX, width, leftEdge, rightEdge, onTrail);
+    }
+
+    /**
+     * Trail width information at a position.
+     */
+    private static class TrailInfo {
+        final float centerlineX;
+        final float trailWidth;
+        final float leftEdge;
+        final float rightEdge;
+        final boolean onTrail;
+
+        TrailInfo(float centerX, float width, float left, float right, boolean onTrail) {
+            this.centerlineX = centerX;
+            this.trailWidth = width;
+            this.leftEdge = left;
+            this.rightEdge = right;
+            this.onTrail = onTrail;
         }
     }
 }

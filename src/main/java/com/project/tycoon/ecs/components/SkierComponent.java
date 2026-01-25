@@ -20,6 +20,12 @@ public class SkierComponent implements Component {
     public float satisfaction; // 0-100 scale, determines if skier leaves early
     public TrailDifficulty targetTrailDifficulty; // What difficulty they're seeking this run
 
+    // Carving/turning state for realistic skiing
+    public float carvingDirection = 0.0f; // -1.0 (left turn) to +1.0 (right turn)
+    public float carvingPhase = 0.0f; // 0.0 to 2π, controls turn cycle
+    public float carvingSpeed = 1.0f; // How fast they complete turns (skill-based)
+    public long randomSeed; // For consistent but varied behavior
+
     public SkierComponent() {
         this.state = State.WAITING;
         this.skillLevel = SkillLevel.INTERMEDIATE; // Default, overridden at spawn
@@ -27,5 +33,6 @@ public class SkierComponent implements Component {
         this.queuePosition = -1;
         this.satisfaction = 50.0f; // Start neutral
         this.targetTrailDifficulty = null; // Chosen when looking for trails
+        this.randomSeed = System.nanoTime(); // Unique per skier
     }
 }

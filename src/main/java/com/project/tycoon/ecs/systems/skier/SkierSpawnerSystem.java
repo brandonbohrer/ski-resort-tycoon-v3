@@ -116,6 +116,28 @@ public class SkierSpawnerSystem implements System {
         skierComp.state = SkierComponent.State.WAITING;
         skierComp.skillLevel = SkillLevel.randomSkill(rand); // Use realistic distribution
         skierComp.satisfaction = 50.0f; // Start neutral
+
+        // Initialize carving parameters based on skill level
+        switch (skierComp.skillLevel) {
+            case BEGINNER:
+                skierComp.carvingSpeed = 0.3f; // Slow, wide turns
+                break;
+            case INTERMEDIATE:
+                skierComp.carvingSpeed = 0.5f; // Medium turns
+                break;
+            case ADVANCED:
+                skierComp.carvingSpeed = 0.8f; // Quick turns
+                break;
+            case EXPERT:
+                skierComp.carvingSpeed = 1.2f; // Very quick, tight turns
+                break;
+        }
+
+        // Add randomness so not all same-skill skiers are identical
+        skierComp.carvingSpeed *= (0.8f + rand.nextFloat() * 0.4f); // ±20% variation
+        skierComp.carvingPhase = rand.nextFloat() * (float) (2 * Math.PI); // Start at random phase
+        skierComp.randomSeed = rand.nextLong(); // Unique seed per skier
+
         engine.addComponent(skier, skierComp);
     }
 }
