@@ -207,7 +207,7 @@ public class GameplayController extends InputAdapter {
                 if (neighbor == null) {
                     continue;
                 }
-                if (neighbor.getDecoration() != com.project.tycoon.world.model.Decoration.NONE) {
+                if (neighbor.getDecoration() == com.project.tycoon.world.model.Decoration.ROCK) {
                     neighbor.setDecoration(com.project.tycoon.world.model.Decoration.NONE);
                     simulation.getWorldMap().setTile(x, z, neighbor);
                 }

@@ -200,9 +200,16 @@ public class TerrainRenderer {
                         p3.set(x + 1, h3, z + 1);
                         p4.set(x, h4, z + 1);
 
-                        Vector3 u = new Vector3(p2).sub(p1);
-                        Vector3 v = new Vector3(p4).sub(p1);
-                        Vector3 faceNorm = v.crs(u).nor();
+                        Vector3 faceNorm;
+                        if (tile.isTrail()) {
+                            // Force flat "up" normal for trails to look smooth/groomed
+                            faceNorm = Vector3.Y.cpy();
+                        } else {
+                            // Standard facet normal for terrain
+                            Vector3 u = new Vector3(p2).sub(p1);
+                            Vector3 v = new Vector3(p4).sub(p1);
+                            faceNorm = v.crs(u).nor();
+                        }
 
                         builder.rect(p1, p2, p3, p4, faceNorm);
                     }
@@ -215,7 +222,7 @@ public class TerrainRenderer {
 
     private Color getTerrainColor(Tile tile) {
         if (tile.isTrail()) {
-            return new Color(0.95f, 0.98f, 1.0f, 1f);
+            return Color.WHITE;
         }
         switch (tile.getType()) {
             case SNOW:
