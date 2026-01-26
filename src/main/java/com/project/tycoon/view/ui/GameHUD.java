@@ -26,6 +26,7 @@ public class GameHUD {
     private FinancesScreen financesScreen;
     private TrailConfirmDialog trailConfirmDialog;
     private ModeIndicator modeIndicator;
+    private EntityInfoPanel entityInfoPanel;
 
     private final TycoonSimulation simulation;
     private final GameplayController controller;
@@ -72,6 +73,9 @@ public class GameHUD {
 
         // Mode indicator
         modeIndicator = new ModeIndicator(skin, stage);
+        
+        // Entity info panel
+        entityInfoPanel = new EntityInfoPanel(skin, stage, simulation.getEcsEngine());
     }
 
     private void handleCategorySelected(String categoryName) {
@@ -115,6 +119,7 @@ public class GameHUD {
     public void render(float dt) {
         moneyTicker.update(dt);
         timeDisplay.update(dt);
+        entityInfoPanel.update(); // Update selected entity info
 
         // Update mode indicator
         updateModeIndicator();
@@ -179,6 +184,14 @@ public class GameHUD {
 
     public Skin getSkin() {
         return skin;
+    }
+
+    public ModeIndicator getModeIndicator() {
+        return modeIndicator;
+    }
+    
+    public EntityInfoPanel getEntityInfoPanel() {
+        return entityInfoPanel;
     }
 
     /**

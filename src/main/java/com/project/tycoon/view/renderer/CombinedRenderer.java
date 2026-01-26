@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g3d.ModelBatch;
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
 import com.project.tycoon.ecs.Engine;
+import com.project.tycoon.ecs.Entity;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
 import com.project.tycoon.world.model.WorldMap;
 import com.project.tycoon.world.SnapPointManager;
@@ -38,7 +39,7 @@ public class CombinedRenderer {
     }
 
     public void render(OrthographicCamera camera, int hoveredX, int hoveredZ, boolean isBuildMode, boolean isTrailMode,
-            boolean isValidSnapPoint, LiftPreview preview) {
+            boolean isValidSnapPoint, LiftPreview preview, Entity selectedEntity, Entity hoveredEntity) {
         // Update logic (e.g. terrain rebuild if dirty)
         terrainRenderer.update();
 
@@ -47,7 +48,7 @@ public class CombinedRenderer {
         // Delegate rendering
         terrainRenderer.render(modelBatch, environment);
         entityRenderer.render(modelBatch, environment, hoveredX, hoveredZ, isBuildMode, isTrailMode, isValidSnapPoint,
-                preview);
+                preview, selectedEntity, hoveredEntity);
 
         modelBatch.end();
     }

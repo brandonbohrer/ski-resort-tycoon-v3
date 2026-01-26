@@ -3,10 +3,12 @@ package com.project.tycoon.view;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.graphics.Cursor;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Vector2;
 import com.project.tycoon.ecs.Entity;
 import com.project.tycoon.ecs.components.LiftComponent;
+import com.project.tycoon.ecs.components.SkierComponent;
 import com.project.tycoon.ecs.components.TransformComponent;
 import com.project.tycoon.economy.EconomyManager;
 import com.project.tycoon.simulation.TycoonSimulation;
@@ -16,6 +18,7 @@ import com.project.tycoon.world.model.TrailDifficulty;
 import com.project.tycoon.world.TrailDifficultyCalculator;
 import com.project.tycoon.view.LiftBuilder.LiftPreview;
 import com.project.tycoon.view.ui.TrailConfirmDialog;
+import com.project.tycoon.view.ui.EntityInfoPanel;
 
 import java.util.*;
 
@@ -35,6 +38,8 @@ public class GameplayController extends InputAdapter {
     private final TycoonSimulation simulation;
     private final MousePicker mousePicker;
     private final EconomyManager economy;
+    private final SelectionManager selectionManager;
+    private CameraController cameraController;
 
     private InteractionMode currentMode = InteractionMode.NONE;
 
@@ -65,11 +70,17 @@ public class GameplayController extends InputAdapter {
     private static final float SNAP_RADIUS = 8.0f; // tiles (increased from 3.0 for easier snapping)
 
     private TrailConfirmDialog trailConfirmDialog; // UI dialog for confirmation
+    private EntityInfoPanel entityInfoPanel; // UI panel for entity info
+    
+    // Double-click detection
+    private long lastClickTime = 0;
+    private static final long DOUBLE_CLICK_TIME = 300; // milliseconds
 
     public GameplayController(TycoonSimulation simulation, OrthographicCamera camera) {
         this.simulation = simulation;
         this.mousePicker = new MousePicker(simulation.getWorldMap(), camera); // Pass camera
         this.economy = simulation.getEconomyManager();
+        this.selectionManager = new SelectionManager(simulation.getEcsEngine(), simulation.getWorldMap());
     }
 
     public void setTrailConfirmDialog(TrailConfirmDialog dialog) {
@@ -89,6 +100,14 @@ public class GameplayController extends InputAdapter {
                 }
             });
         }
+    }
+    
+    public void setEntityInfoPanel(EntityInfoPanel panel) {
+        this.entityInfoPanel = panel;
+    }
+    
+    public void setCameraController(CameraController cameraController) {
+        this.cameraController = cameraController;
     }
 
     @Override
@@ -131,6 +150,21 @@ public class GameplayController extends InputAdapter {
             if (trailBuildState == TrailBuildState.PAINTING) {
                 autoPaintTrailTile();
             }
+        }
+        
+        // Update hover state in selection manager (in NONE mode)
+        if (currentMode == InteractionMode.NONE) {
+            selectionManager.updateHover(hoveredX, hoveredZ);
+            
+            // Change cursor based on hover state
+            if (selectionManager.hasHoveredEntity()) {
+                Gdx.graphics.setSystemCursor(Cursor.SystemCursor.Hand);
+            } else {
+                Gdx.graphics.setSystemCursor(Cursor.SystemCursor.Arrow);
+            }
+        } else {
+            // Reset cursor in other modes
+            Gdx.graphics.setSystemCursor(Cursor.SystemCursor.Arrow);
         }
 
         return false;
@@ -425,14 +459,39 @@ public class GameplayController extends InputAdapter {
 
             Tile tile = simulation.getWorldMap().getTile(hoveredX, hoveredZ);
             if (tile != null) {
-                if (currentMode == InteractionMode.TRAIL) {
+                // If in NONE mode, try to select entities
+                if (currentMode == InteractionMode.NONE) {
+                    boolean selected = selectionManager.selectAt(hoveredX, hoveredZ);
+                    if (selected) {
+                        Entity selectedEntity = selectionManager.getSelectedEntity();
+                        System.out.println("Selected entity at (" + hoveredX + ", " + hoveredZ + ")");
+                        if (entityInfoPanel != null) {
+                            entityInfoPanel.setSelectedEntity(selectedEntity);
+                        }
+                        
+                        // Check for double-click on skier
+                        long currentTime = java.lang.System.currentTimeMillis();
+                        if (currentTime - lastClickTime < DOUBLE_CLICK_TIME) {
+                            // Double-click detected
+                            if (simulation.getEcsEngine().hasComponent(selectedEntity, SkierComponent.class)) {
+                                if (cameraController != null) {
+                                    cameraController.followEntity(selectedEntity);
+                                    System.out.println("Double-click: Following skier!");
+                                }
+                            }
+                        }
+                        lastClickTime = currentTime;
+                        
+                        return true;
+                    }
+                } else if (currentMode == InteractionMode.TRAIL) {
                     handleTrailClick();
                 } else {
                     handleInteraction(tile);
                 }
                 return true;
             }
-        } else if (button == Input.Buttons.RIGHT) {
+            } else if (button == Input.Buttons.RIGHT) {
             // Right-click behavior in trail mode
             if (currentMode == InteractionMode.TRAIL) {
                 if (trailBuildState == TrailBuildState.PAINTING) {
@@ -446,6 +505,13 @@ public class GameplayController extends InputAdapter {
                     setMode(InteractionMode.NONE);
                     return true;
                 }
+            } else if (currentMode == InteractionMode.NONE) {
+                // Right-click in NONE mode: deselect (but don't consume event so camera can pan)
+                selectionManager.clearSelection();
+                if (entityInfoPanel != null) {
+                    entityInfoPanel.setSelectedEntity(null);
+                }
+                return false; // Don't consume the event - let camera controller handle it
             }
         }
         return false;
@@ -642,5 +708,9 @@ public class GameplayController extends InputAdapter {
 
     public SnapPoint getTrailStartSnapPoint() {
         return trailStartSnapPoint;
+    }
+    
+    public SelectionManager getSelectionManager() {
+        return selectionManager;
     }
 }

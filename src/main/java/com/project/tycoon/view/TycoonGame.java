@@ -51,7 +51,7 @@ public class TycoonGame extends Game {
         camera.far = 3000f; // Draw distance
         camera.update();
 
-        cameraController = new CameraController(camera);
+        cameraController = new CameraController(camera, simulation.getEcsEngine());
         gameplayController = new GameplayController(simulation, camera);
 
         // Initialize HUD
@@ -64,6 +64,12 @@ public class TycoonGame extends Game {
 
         // Connect trail confirm dialog to gameplay controller
         gameplayController.setTrailConfirmDialog(gameHUD.getTrailConfirmDialog());
+        
+        // Connect entity info panel to gameplay controller
+        gameplayController.setEntityInfoPanel(gameHUD.getEntityInfoPanel());
+        
+        // Connect camera controller to gameplay controller for follow feature
+        gameplayController.setCameraController(cameraController);
 
         // Multiplexer to handle both camera and gameplay inputs
         com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();
@@ -108,8 +114,10 @@ public class TycoonGame extends Game {
         boolean isBuildMode = gameplayController.getCurrentMode() == GameplayController.InteractionMode.BUILD;
         boolean isTrailMode = gameplayController.isTrailMode();
         boolean isValidSnapPoint = gameplayController.isValidSnapPointNearby();
+        com.project.tycoon.ecs.Entity selectedEntity = gameplayController.getSelectionManager().getSelectedEntity();
+        com.project.tycoon.ecs.Entity hoveredEntity = gameplayController.getSelectionManager().getHoveredEntity();
         combinedRenderer.render(camera, gameplayController.getHoveredX(), gameplayController.getHoveredZ(),
-                isBuildMode, isTrailMode, isValidSnapPoint, gameplayController.getCurrentPreview());
+                isBuildMode, isTrailMode, isValidSnapPoint, gameplayController.getCurrentPreview(), selectedEntity, hoveredEntity);
 
         // 3. Render UI (On top)
         gameHUD.render((float) deltaTime);

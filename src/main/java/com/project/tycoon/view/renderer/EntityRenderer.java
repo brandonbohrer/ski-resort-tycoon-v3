@@ -23,7 +23,9 @@ import com.project.tycoon.world.model.SnapPoint;
 import com.project.tycoon.world.SnapPointManager;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class EntityRenderer {
@@ -42,13 +44,19 @@ public class EntityRenderer {
     }
 
     public void render(ModelBatch batch, Environment environment, int hoveredX, int hoveredZ, boolean isBuildMode,
-            boolean isTrailMode, boolean isValidSnapPoint, LiftPreview preview) {
+            boolean isTrailMode, boolean isValidSnapPoint, LiftPreview preview, Entity selectedEntity, Entity hoveredEntity) {
         // Cache Transforms
         Map<UUID, TransformComponent> transformCache = new HashMap<>();
         for (Entity entity : ecsEngine.getEntities()) {
             if (ecsEngine.hasComponent(entity, TransformComponent.class)) {
                 transformCache.put(entity.getId(), ecsEngine.getComponent(entity, TransformComponent.class));
             }
+        }
+        
+        // Find all pylons in the hovered lift chain
+        Set<UUID> hoveredLiftChain = new HashSet<>();
+        if (hoveredEntity != null && ecsEngine.hasComponent(hoveredEntity, LiftComponent.class)) {
+            hoveredLiftChain = findEntireLiftChain(hoveredEntity);
         }
 
         // Render Entities & Cables
@@ -61,23 +69,66 @@ public class EntityRenderer {
                 float drawY = t.y * IsoUtils.HEIGHT_SCALE;
 
                 if (ecsEngine.hasComponent(entity, LiftComponent.class)) {
-                    renderModelAt(batch, environment, assets.liftPylonModel, drawX, drawY, drawZ, Color.WHITE);
+                    // Pulse brightness if this pylon is part of the hovered lift chain
+                    Color liftColor = Color.WHITE.cpy();
+                    if (hoveredLiftChain.contains(entity.getId())) {
+                        float pulse = 0.7f + 0.3f * (float)Math.sin(java.lang.System.currentTimeMillis() / 200.0);
+                        liftColor = new Color(pulse, pulse, pulse, 1f);
+                    }
+                    renderModelAt(batch, environment, assets.liftPylonModel, drawX, drawY, drawZ, liftColor);
 
                     // Draw Cable
                     LiftComponent lift = ecsEngine.getComponent(entity, LiftComponent.class);
                     if (lift.nextPylonId != null && transformCache.containsKey(lift.nextPylonId)) {
                         TransformComponent next = transformCache.get(lift.nextPylonId);
-                        drawCable(batch, environment, t, next);
+                        // Pulse cable if part of hovered lift chain
+                        boolean cableShouldPulse = hoveredLiftChain.contains(entity.getId());
+                        drawCable(batch, environment, t, next, cableShouldPulse);
+                    }
+                    
+                    // Highlight if selected
+                    if (selectedEntity != null && entity.getId().equals(selectedEntity.getId())) {
+                        renderSelectionRing(batch, environment, drawX, drawY, drawZ, 2f, Color.GREEN);
                     }
 
                 } else if (ecsEngine.hasComponent(entity, SkierComponent.class)) {
                     // Add variety to skier jacket colors
                     Color skierColor = getSkierColor(entity.getId());
+                    
+                    // Pulse brightness if hovered (brighten the entire model)
+                    if (hoveredEntity != null && entity.getId().equals(hoveredEntity.getId())) {
+                        float pulse = 0.8f + 0.2f * (float)Math.sin(java.lang.System.currentTimeMillis() / 150.0);
+                        // Brighten by multiplying with a brighter color
+                        skierColor = new Color(
+                            Math.min(1f, skierColor.r * (1f + pulse * 0.5f)),
+                            Math.min(1f, skierColor.g * (1f + pulse * 0.5f)),
+                            Math.min(1f, skierColor.b * (1f + pulse * 0.5f)),
+                            1f
+                        );
+                    }
+                    
                     renderModelAt(batch, environment, assets.skierModel, drawX, drawY, drawZ, skierColor);
+                    
+                    // Highlight if selected
+                    if (selectedEntity != null && entity.getId().equals(selectedEntity.getId())) {
+                        renderSelectionRing(batch, environment, drawX, drawY, drawZ, 1.5f, Color.CYAN);
+                    }
 
                 } else if (ecsEngine.hasComponent(entity, BaseCampComponent.class)) {
+                    // Pulse brightness if hovered
+                    Color buildingColor = Color.WHITE.cpy();
+                    if (hoveredEntity != null && entity.getId().equals(hoveredEntity.getId())) {
+                        float pulse = 0.7f + 0.3f * (float)Math.sin(java.lang.System.currentTimeMillis() / 200.0);
+                        buildingColor = new Color(pulse, pulse, pulse, 1f);
+                    }
+                    
                     // Offset +3 units so building sits on terrain instead of sinking
-                    renderModelAt(batch, environment, assets.baseCampModel, drawX, drawY + 3f, drawZ, Color.WHITE);
+                    renderModelAt(batch, environment, assets.baseCampModel, drawX, drawY + 3f, drawZ, buildingColor);
+                    
+                    // Highlight if selected
+                    if (selectedEntity != null && entity.getId().equals(selectedEntity.getId())) {
+                        renderSelectionRing(batch, environment, drawX, drawY, drawZ, 5f, Color.YELLOW);
+                    }
                 }
             }
         }
@@ -151,7 +202,7 @@ public class EntityRenderer {
         }
     }
 
-    private void drawCable(ModelBatch batch, Environment env, TransformComponent start, TransformComponent end) {
+    private void drawCable(ModelBatch batch, Environment env, TransformComponent start, TransformComponent end, boolean shouldPulse) {
         float startY = start.y * IsoUtils.HEIGHT_SCALE + 2.8f; // Top of pylon
         float endY = end.y * IsoUtils.HEIGHT_SCALE + 2.8f;
 
@@ -183,6 +234,15 @@ public class EntityRenderer {
         }
 
         cable.transform.scale(1f, length, 1f); // Scale along Y for cylinder
+        
+        // Apply pulse color if needed
+        if (shouldPulse) {
+            float pulse = 0.7f + 0.3f * (float)Math.sin(java.lang.System.currentTimeMillis() / 200.0);
+            Color pulseColor = new Color(pulse, pulse, pulse, 1f);
+            for (Material m : cable.materials) {
+                m.set(ColorAttribute.createDiffuse(pulseColor));
+            }
+        }
 
         batch.render(cable, env);
 
@@ -215,15 +275,92 @@ public class EntityRenderer {
         }
     }
 
+    /**
+     * Find all pylons in a lift chain (follow the linked list in both directions).
+     */
+    private Set<UUID> findEntireLiftChain(Entity startPylon) {
+        Set<UUID> chain = new HashSet<>();
+        
+        // Start from the very first pylon (go backwards first)
+        Entity firstPylon = findFirstPylonInChain(startPylon);
+        
+        // Now follow forward through the entire chain
+        Entity current = firstPylon;
+        while (current != null) {
+            chain.add(current.getId());
+            
+            LiftComponent lift = ecsEngine.getComponent(current, LiftComponent.class);
+            if (lift != null && lift.nextPylonId != null) {
+                // Find the next pylon entity
+                Entity next = null;
+                for (Entity e : ecsEngine.getEntities()) {
+                    if (e.getId().equals(lift.nextPylonId)) {
+                        next = e;
+                        break;
+                    }
+                }
+                current = next;
+            } else {
+                break;
+            }
+        }
+        
+        return chain;
+    }
+    
+    /**
+     * Find the first pylon in a lift chain by going backwards.
+     */
+    private Entity findFirstPylonInChain(Entity pylon) {
+        Entity first = pylon;
+        
+        // Keep searching for pylons that point to this one
+        boolean foundPrevious = true;
+        while (foundPrevious) {
+            foundPrevious = false;
+            for (Entity e : ecsEngine.getEntities()) {
+                if (!ecsEngine.hasComponent(e, LiftComponent.class)) continue;
+                
+                LiftComponent lift = ecsEngine.getComponent(e, LiftComponent.class);
+                if (lift.nextPylonId != null && lift.nextPylonId.equals(first.getId())) {
+                    first = e;
+                    foundPrevious = true;
+                    break;
+                }
+            }
+        }
+        
+        return first;
+    }
+
     private void renderModelAt(ModelBatch batch, Environment env, Model model, float x, float y, float z, Color tint) {
         ModelInstance instance = new ModelInstance(model);
         instance.transform.setToTranslation(x + 0.5f, y, z + 0.5f);
 
+        // Only apply tint if it's not white (preserve original model colors when white)
         if (!tint.equals(Color.WHITE)) {
             for (Material m : instance.materials) {
                 m.set(ColorAttribute.createDiffuse(tint));
             }
         }
+        
         batch.render(instance, env);
+    }
+    
+    /**
+     * Render a selection ring/highlight around an entity.
+     */
+    private void renderSelectionRing(ModelBatch batch, Environment env, float x, float y, float z, float radius, Color color) {
+        // Create a thin, flat cylinder as a ring
+        ModelInstance ring = new ModelInstance(assets.cursorModel); // Reuse cursor model for now
+        ring.transform.setToTranslation(x + 0.5f, y + 0.1f, z + 0.5f); // Slightly above ground
+        ring.transform.scale(radius, 0.1f, radius); // Flat, wide ring
+        
+        // Set bright color
+        for (Material m : ring.materials) {
+            m.set(ColorAttribute.createDiffuse(color));
+        }
+        
+        batch.render(ring, env);
     }
 }
