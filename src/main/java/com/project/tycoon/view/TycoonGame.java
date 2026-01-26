@@ -70,6 +70,14 @@ public class TycoonGame extends Game {
         
         // Connect camera controller to gameplay controller for follow feature
         gameplayController.setCameraController(cameraController);
+        
+        // Connect follow button in entity info panel to camera controller
+        gameHUD.getEntityInfoPanel().setFollowListener(new com.project.tycoon.view.ui.EntityInfoPanel.FollowListener() {
+            @Override
+            public void onFollowSkier(com.project.tycoon.ecs.Entity skier) {
+                cameraController.followEntity(skier);
+            }
+        });
 
         // Multiplexer to handle both camera and gameplay inputs
         com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();

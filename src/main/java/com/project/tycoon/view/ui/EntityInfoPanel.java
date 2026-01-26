@@ -5,6 +5,8 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.project.tycoon.ecs.Engine;
 import com.project.tycoon.ecs.Entity;
 import com.project.tycoon.ecs.components.*;
@@ -23,8 +25,15 @@ public class EntityInfoPanel {
     private Label line1Label;
     private Label line2Label;
     private Label line3Label;
+    private TextButton followButton;
     
     private Entity currentEntity = null;
+    
+    // Callback for follow button
+    public interface FollowListener {
+        void onFollowSkier(Entity skier);
+    }
+    private FollowListener followListener;
     
     public EntityInfoPanel(Skin skin, Stage stage, Engine engine) {
         this.skin = skin;
@@ -64,10 +73,27 @@ public class EntityInfoPanel {
         line3Label.setColor(new Color(0.85f, 0.85f, 0.85f, 1f));
         panel.add(line3Label).left().pad(2).row();
         
+        // Follow button (only shown for skiers)
+        followButton = new TextButton("Follow Skier", skin);
+        followButton.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
+                if (followListener != null && currentEntity != null) {
+                    followListener.onFollowSkier(currentEntity);
+                }
+            }
+        });
+        panel.add(followButton).left().padTop(10).width(150).height(35).row();
+        followButton.setVisible(false); // Hidden by default
+        
         container.add(panel);
         panel.setVisible(false);
         
         stage.addActor(container);
+    }
+    
+    public void setFollowListener(FollowListener listener) {
+        this.followListener = listener;
     }
     
     /**
@@ -113,20 +139,24 @@ public class EntityInfoPanel {
         // Skier
         if (engine.hasComponent(currentEntity, SkierComponent.class)) {
             displaySkierInfo();
+            followButton.setVisible(true); // Show follow button for skiers
         }
         // Lift
         else if (engine.hasComponent(currentEntity, LiftComponent.class)) {
             displayLiftInfo();
+            followButton.setVisible(false);
         }
         // Base Camp
         else if (engine.hasComponent(currentEntity, BaseCampComponent.class)) {
             displayBaseCampInfo();
+            followButton.setVisible(false);
         }
         else {
             titleLabel.setText("Unknown Entity");
             line1Label.setText("");
             line2Label.setText("");
             line3Label.setText("");
+            followButton.setVisible(false);
         }
     }
     

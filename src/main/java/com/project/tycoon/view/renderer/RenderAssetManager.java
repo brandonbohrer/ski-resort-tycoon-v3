@@ -27,6 +27,7 @@ public class RenderAssetManager {
 
     // Base Camp Building
     public Model baseCampModel;
+    public Model skisModel; // Ski equipment
 
     public RenderAssetManager() {
         buildModels();
@@ -177,6 +178,25 @@ public class RenderAssetManager {
                 .box(16.8f, 1.2f, 3.2f);
 
         baseCampModel = mb.end();
+        
+        // Skis - Two thin boxes for realistic ski equipment
+        mb.begin();
+        
+        // Left ski (thin, long box)
+        mb.node().id = "ski_left";
+        mb.node().translation.set(-0.15f, -0.25f, 0);
+        mb.part("ski_left", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(1.0f, 0.2f, 0.0f, 1f)))) // Bright orange
+                .box(0.08f, 0.02f, 0.9f); // Thin, flat, long
+        
+        // Right ski
+        mb.node().id = "ski_right";
+        mb.node().translation.set(0.15f, -0.25f, 0);
+        mb.part("ski_right", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal,
+                new Material(ColorAttribute.createDiffuse(new Color(1.0f, 0.2f, 0.0f, 1f))))
+                .box(0.08f, 0.02f, 0.9f);
+        
+        skisModel = mb.end();
     }
 
     public void dispose() {

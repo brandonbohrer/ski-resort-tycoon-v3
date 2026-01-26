@@ -75,15 +75,26 @@ public class EntityRenderer {
                         float pulse = 0.7f + 0.3f * (float)Math.sin(java.lang.System.currentTimeMillis() / 200.0);
                         liftColor = new Color(pulse, pulse, pulse, 1f);
                     }
-                    renderModelAt(batch, environment, assets.liftPylonModel, drawX, drawY, drawZ, liftColor);
+                    
+                    // Make pylons bigger and more visible
+                    ModelInstance pylonInstance = new ModelInstance(assets.liftPylonModel);
+                    pylonInstance.transform.setToTranslation(drawX + 0.5f, drawY, drawZ + 0.5f);
+                    pylonInstance.transform.scale(1.5f, 1.5f, 1.5f); // 50% bigger
+                    
+                    if (!liftColor.equals(Color.WHITE)) {
+                        for (Material m : pylonInstance.materials) {
+                            m.set(ColorAttribute.createDiffuse(liftColor));
+                        }
+                    }
+                    batch.render(pylonInstance, environment);
 
-                    // Draw Cable
+                    // Draw Cable with chairs and skiers
                     LiftComponent lift = ecsEngine.getComponent(entity, LiftComponent.class);
                     if (lift.nextPylonId != null && transformCache.containsKey(lift.nextPylonId)) {
                         TransformComponent next = transformCache.get(lift.nextPylonId);
                         // Pulse cable if part of hovered lift chain
                         boolean cableShouldPulse = hoveredLiftChain.contains(entity.getId());
-                        drawCable(batch, environment, t, next, cableShouldPulse);
+                        drawCableWithChairs(batch, environment, t, next, entity, cableShouldPulse);
                     }
                     
                     // Highlight if selected
@@ -92,6 +103,12 @@ public class EntityRenderer {
                     }
 
                 } else if (ecsEngine.hasComponent(entity, SkierComponent.class)) {
+                    // Skip rendering skiers who are riding lifts (they're rendered on chairs)
+                    SkierComponent skierComp = ecsEngine.getComponent(entity, SkierComponent.class);
+                    if (skierComp.state == SkierComponent.State.RIDING_LIFT) {
+                        continue; // Don't render them here, they're on a chair
+                    }
+                    
                     // Add variety to skier jacket colors
                     Color skierColor = getSkierColor(entity.getId());
                     
@@ -108,6 +125,9 @@ public class EntityRenderer {
                     }
                     
                     renderModelAt(batch, environment, assets.skierModel, drawX, drawY, drawZ, skierColor);
+                    
+                    // Add skis to skiers (not when riding lifts - checked above)
+                    renderSkis(batch, environment, drawX, drawY, drawZ);
                     
                     // Highlight if selected
                     if (selectedEntity != null && entity.getId().equals(selectedEntity.getId())) {
@@ -200,6 +220,125 @@ public class EntityRenderer {
                 renderModelAt(batch, environment, assets.cursorModel, sp.getX(), h + 0.5f, sp.getZ(), snapColor);
             }
         }
+    }
+
+    private void drawCableWithChairs(ModelBatch batch, Environment env, TransformComponent start, TransformComponent end, 
+                                      Entity liftEntity, boolean shouldPulse) {
+        float startY = start.y * IsoUtils.HEIGHT_SCALE + 4.5f; // Higher up on bigger pylon
+        float endY = end.y * IsoUtils.HEIGHT_SCALE + 4.5f;
+
+        Vector3 p1 = new Vector3(start.x + 0.5f, startY, start.z + 0.5f);
+        Vector3 p2 = new Vector3(end.x + 0.5f, endY, end.z + 0.5f);
+
+        Vector3 direction = new Vector3(p2).sub(p1);
+        float length = direction.len();
+
+        Vector3 mid = new Vector3(p1).add(p2).scl(0.5f);
+
+        // Draw thicker cable
+        ModelInstance cable = new ModelInstance(assets.cableModel);
+        cable.transform.setToTranslation(mid);
+
+        // Calculate rotation to align cylinder with direction vector
+        Vector3 dirNorm = direction.cpy().nor();
+        Vector3 cylinderAxis = Vector3.Y.cpy(); // Cylinders are built along Y axis
+        Vector3 rotationAxis = cylinderAxis.crs(dirNorm).nor();
+        float dot = cylinderAxis.dot(dirNorm);
+        float angle = (float) Math.toDegrees(Math.acos(Math.max(-1f, Math.min(1f, dot))));
+
+        if (rotationAxis.len2() < 0.001f) {
+            // Parallel or anti-parallel
+            if (dot < 0) {
+                cable.transform.rotate(Vector3.X, 180);
+            }
+        } else {
+            cable.transform.rotate(rotationAxis, angle);
+        }
+
+        cable.transform.scale(2.5f, length, 2.5f); // Much thicker cable (2.5x)
+        
+        // Apply pulse color if needed
+        if (shouldPulse) {
+            float pulse = 0.7f + 0.3f * (float)Math.sin(java.lang.System.currentTimeMillis() / 200.0);
+            Color pulseColor = new Color(pulse, pulse, pulse, 1f);
+            for (Material m : cable.materials) {
+                m.set(ColorAttribute.createDiffuse(pulseColor));
+            }
+        }
+
+        batch.render(cable, env);
+
+        // Draw chairs with skiers riding this lift segment
+        drawChairsOnCable(batch, env, p1, p2, liftEntity);
+    }
+    
+    private void drawChairsOnCable(ModelBatch batch, Environment env, Vector3 start, Vector3 end, Entity liftEntity) {
+        // Draw chairs with skiers riding between these two pylons
+        for (Entity entity : ecsEngine.getEntities()) {
+            if (!ecsEngine.hasComponent(entity, SkierComponent.class)) continue;
+            
+            SkierComponent skier = ecsEngine.getComponent(entity, SkierComponent.class);
+            TransformComponent skierPos = ecsEngine.getComponent(entity, TransformComponent.class);
+            
+            // Only show skiers actively riding lifts
+            if (skier.state != SkierComponent.State.RIDING_LIFT || skierPos == null) continue;
+            
+            // Calculate skier's position in world space
+            Vector3 skierWorldPos = new Vector3(skierPos.x, skierPos.y * IsoUtils.HEIGHT_SCALE, skierPos.z);
+            
+            // Check if skier is near this cable segment (between start and end)
+            Vector3 cableVector = new Vector3(end).sub(start);
+            float cableLength = cableVector.len();
+            
+            if (cableLength < 0.1f) continue; // Skip invalid segments
+            
+            // Project skier position onto cable line
+            Vector3 startToSkier = new Vector3(skierWorldPos).sub(start);
+            float t = startToSkier.dot(cableVector) / (cableLength * cableLength);
+            
+            // Only render if skier is on this segment (with small margin)
+            if (t < -0.1f || t > 1.1f) continue;
+            
+            t = Math.max(0f, Math.min(1f, t)); // Clamp to [0, 1]
+            
+            // Calculate chair position on cable
+            Vector3 chairPos = new Vector3(start).lerp(end, t);
+            chairPos.y -= 1.5f; // Hang chair below cable
+            
+            // Draw chair
+            ModelInstance chair = new ModelInstance(assets.cursorModel); // Use cursor as chair placeholder
+            chair.transform.setToTranslation(chairPos);
+            chair.transform.scale(1.2f, 0.3f, 1.0f); // Flat chair shape
+            
+            // Chair color
+            for (Material m : chair.materials) {
+                m.set(ColorAttribute.createDiffuse(new Color(0.2f, 0.2f, 0.2f, 1f))); // Dark gray chair
+            }
+            batch.render(chair, env);
+            
+            // Draw skier on chair
+            Color skierColor = getSkierColor(entity.getId());
+            ModelInstance skierOnChair = new ModelInstance(assets.skierModel);
+            skierOnChair.transform.setToTranslation(chairPos.x, chairPos.y, chairPos.z);
+            skierOnChair.transform.scale(0.8f, 0.8f, 0.8f); // Slightly smaller
+            
+            for (Material m : skierOnChair.materials) {
+                m.set(ColorAttribute.createDiffuse(skierColor));
+            }
+            batch.render(skierOnChair, env);
+            
+            // Also render skis on the chair
+            renderSkis(batch, env, chairPos.x, chairPos.y, chairPos.z);
+        }
+    }
+    
+    /**
+     * Render skis on a skier.
+     */
+    private void renderSkis(ModelBatch batch, Environment env, float x, float y, float z) {
+        ModelInstance skis = new ModelInstance(assets.skisModel);
+        skis.transform.setToTranslation(x + 0.5f, y, z + 0.5f);
+        batch.render(skis, env);
     }
 
     private void drawCable(ModelBatch batch, Environment env, TransformComponent start, TransformComponent end, boolean shouldPulse) {
